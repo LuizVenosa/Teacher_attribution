@@ -1,4 +1,4 @@
-project_root: .
+﻿project_root: .
 
 prompt_dir: data/prompts
 teacher_output_dir: data/teacher_outputs
@@ -10,5 +10,6 @@ student_model_dir: models/students
 attribution_model_dir: models/attribution_encoder
 results_dir: results
 
-hf_cache_dir: /scratch/${USER}/hf_cache
-wandb_dir: /scratch/${USER}/wandb
+hf_cache_dir: .cache/huggingface
+wandb_dir: wandb
+

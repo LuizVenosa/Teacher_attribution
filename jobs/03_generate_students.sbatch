@@ -1,6 +1,10 @@
 #!/bin/bash
 #SBATCH --job-name=gen_student
-#SBATCH --partition=gpu
+#SBATCH --account=3191856
+#SBATCH --partition=stud
+#SBATCH --qos=stud
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
@@ -10,8 +14,8 @@
 #SBATCH --error=logs/gen_student_%A_%a.err
 
 set -euo pipefail
-SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-source "$SCRIPT_DIR/00_setup_env.sh"
+SETUP_ROOT="${PROJECT_ROOT:-${SLURM_SUBMIT_DIR:-/home/3191856/NLP_project/Teacher_attribution}}"
+source "$SETUP_ROOT/jobs/00_setup_env.sh"
 
 TEACHERS=("qwen" "llama" "mistral" "gemma")
 SPLITS=("train" "val" "test")
@@ -31,3 +35,5 @@ python scripts/generate_students.py \
   --prompts "data/prompts/prompts_${SPLIT}.jsonl" \
   --output "data/student_outputs/student_from_${TEACHER_ID}_${SPLIT}.jsonl" \
   --resume
+
+

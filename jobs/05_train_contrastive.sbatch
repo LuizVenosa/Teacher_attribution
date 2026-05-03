@@ -1,6 +1,10 @@
 #!/bin/bash
 #SBATCH --job-name=train_attr
-#SBATCH --partition=gpu
+#SBATCH --account=3191856
+#SBATCH --partition=stud
+#SBATCH --qos=stud
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=80G
@@ -9,9 +13,11 @@
 #SBATCH --error=logs/train_attr_%j.err
 
 set -euo pipefail
-SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-source "$SCRIPT_DIR/00_setup_env.sh"
+SETUP_ROOT="${PROJECT_ROOT:-${SLURM_SUBMIT_DIR:-/home/3191856/NLP_project/Teacher_attribution}}"
+source "$SETUP_ROOT/jobs/00_setup_env.sh"
 
 python scripts/train_contrastive_encoder.py \
   --models_config configs/models.yaml \
   --attribution_config configs/attribution.yaml
+
+
