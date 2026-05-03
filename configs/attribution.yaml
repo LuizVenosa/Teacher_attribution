@@ -1,0 +1,23 @@
+train_file: data/attribution/train_pairs.jsonl
+val_file: data/attribution/val_pairs.jsonl
+test_file: data/attribution/test_pairs.jsonl
+output_dir: models/attribution_encoder/modernbert_contrastive
+
+max_length: 768
+projection_dim: 256
+temperature: 0.07
+classification_weight: 0.2
+
+num_epochs: 3
+batch_size: 8
+gradient_accumulation_steps: 4
+learning_rate: 0.00002
+weight_decay: 0.01
+warmup_ratio: 0.06
+max_grad_norm: 1.0
+mixed_precision: bf16
+seed: 13
+
+eval_batch_size: 16
+set_sizes: [1, 2, 4, 8, 16, 32, 64]
+set_repeats: 20

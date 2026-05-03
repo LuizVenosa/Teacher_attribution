@@ -1,0 +1,94 @@
+from __future__ import annotations
+
+import argparse
+import logging
+from pathlib import Path
+
+from teacher_attr.io import load_jsonl, load_yaml, write_jsonl
+from teacher_attr.utils import setup_logging, teacher_order_from_config
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Align student and teacher outputs into InfoNCE rows.")
+    parser.add_argument("--models_config", required=True)
+    parser.add_argument("--student_outputs_dir", required=True)
+    parser.add_argument("--teacher_outputs_dir", required=True)
+    parser.add_argument("--split", required=True)
+    parser.add_argument("--output", required=True)
+    parser.add_argument("--allow_missing", action="store_true")
+    return parser.parse_args()
+
+
+def load_teacher_outputs(
+    teacher_outputs_dir: Path,
+    split: str,
+    teacher_ids: list[str],
+) -> dict[str, dict[str, dict]]:
+    by_teacher: dict[str, dict[str, dict]] = {}
+    for teacher_id in teacher_ids:
+        path = teacher_outputs_dir / f"{teacher_id}_{split}.jsonl"
+        rows = load_jsonl(path)
+        by_teacher[teacher_id] = {row["prompt_id"]: row for row in rows}
+        logging.info("Loaded %d teacher rows from %s", len(rows), path)
+    return by_teacher
+
+
+def main() -> None:
+    setup_logging()
+    args = parse_args()
+
+    models_cfg = load_yaml(args.models_config)
+    teacher_ids = teacher_order_from_config(models_cfg)
+    label_lookup = models_cfg["teacher_labels"]
+
+    teacher_outputs = load_teacher_outputs(
+        Path(args.teacher_outputs_dir),
+        args.split,
+        teacher_ids,
+    )
+
+    student_paths = sorted(Path(args.student_outputs_dir).glob(f"student_from_*_{args.split}.jsonl"))
+    if not student_paths:
+        raise FileNotFoundError(f"No student outputs found for split={args.split}")
+
+    pairs = []
+    missing = 0
+    for student_path in student_paths:
+        for row in load_jsonl(student_path):
+            prompt_id = row["prompt_id"]
+            teacher_responses = {}
+            for teacher_id in teacher_ids:
+                teacher_row = teacher_outputs[teacher_id].get(prompt_id)
+                if teacher_row is None:
+                    missing += 1
+                    break
+                teacher_responses[teacher_id] = teacher_row["response"]
+            else:
+                true_teacher = row["true_teacher"]
+                pairs.append(
+                    {
+                        "prompt_id": prompt_id,
+                        "task": row.get("task"),
+                        "split": row.get("split", args.split),
+                        "anchor_student_id": row["student_id"],
+                        "true_teacher": true_teacher,
+                        "prompt": row["prompt"],
+                        "student_response": row["response"],
+                        "teacher_responses": teacher_responses,
+                        "label": label_lookup[true_teacher],
+                    }
+                )
+
+    if missing and not args.allow_missing:
+        raise ValueError(
+            f"Missing {missing} teacher responses for split={args.split}. "
+            "Regenerate teacher outputs or pass --allow_missing to skip incomplete rows."
+        )
+
+    pairs.sort(key=lambda item: (item["anchor_student_id"], item["prompt_id"]))
+    write_jsonl(args.output, pairs)
+    logging.info("Wrote %d attribution pairs to %s", len(pairs), args.output)
+
+
+if __name__ == "__main__":
+    main()

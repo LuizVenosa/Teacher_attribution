@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Environments
+.venv/
+venv/
+.env
+
+# Logs and local runs
+logs/
+wandb/
+*.log
+
+# Hugging Face and model caches
+hf_cache/
+.cache/
+
+# Generated data and checkpoints
+data/**/*.jsonl
+data/**/*.json
+!data/**/.gitkeep
+models/**
+!models/**/
+!models/**/.gitkeep
+results/**
+!results/**/
+!results/**/.gitkeep
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

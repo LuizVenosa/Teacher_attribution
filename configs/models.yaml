@@ -1,0 +1,21 @@
+teachers:
+  qwen:
+    hf_name: Qwen/Qwen2.5-7B-Instruct
+  llama:
+    hf_name: meta-llama/Llama-3.1-8B-Instruct
+  mistral:
+    hf_name: mistralai/Mistral-7B-Instruct-v0.3
+  gemma:
+    hf_name: google/gemma-2-9b-it
+
+student_base:
+  hf_name: Qwen/Qwen2.5-1.5B-Instruct
+
+attribution_encoder:
+  hf_name: answerdotai/ModernBERT-base
+
+teacher_labels:
+  qwen: 0
+  llama: 1
+  mistral: 2
+  gemma: 3

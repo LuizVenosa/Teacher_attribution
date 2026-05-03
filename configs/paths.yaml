@@ -1,0 +1,14 @@
+project_root: .
+
+prompt_dir: data/prompts
+teacher_output_dir: data/teacher_outputs
+distill_data_dir: data/distill_data
+student_output_dir: data/student_outputs
+attribution_data_dir: data/attribution
+
+student_model_dir: models/students
+attribution_model_dir: models/attribution_encoder
+results_dir: results
+
+hf_cache_dir: /scratch/${USER}/hf_cache
+wandb_dir: /scratch/${USER}/wandb
