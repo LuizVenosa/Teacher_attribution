@@ -142,3 +142,14 @@ bash scripts/submit_slurm_pipeline.sh --skip-existing-outputs
 # Smaller end-to-end smoke run.
 bash scripts/submit_slurm_pipeline.sh --distill-size 20 --train-size 20 --val-size 8 --test-size 8
 ```
+Submit the orchestrator itself through SLURM:
+
+```bash
+sbatch jobs/00_run_pipeline.sbatch
+```
+
+Tiny SLURM-batched smoke run:
+
+```bash
+sbatch jobs/00_run_pipeline.sbatch --distill-size 20 --train-size 20 --val-size 8 --test-size 8
+```
