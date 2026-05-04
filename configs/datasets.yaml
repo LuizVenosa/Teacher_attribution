@@ -1,0 +1,20 @@
+# Prompt-bank settings for the datasets used by Wadhwa et al. (2025),
+# "Who Taught You That? Tracing Teachers in Model Distillation".
+source: who_taught_you_that
+datasets:
+  - cnn_dailymail
+  - sumpubmed
+  - rotten_tomatoes
+  - commonsenseqa
+  - openbookqa
+  - quarel
+  - alpaca
+
+# Long summarization inputs can make teacher generation expensive.
+# Raise this if you want fuller articles and have enough GPU time.
+max_input_chars: 6000
+
+# The paper generates QA reasoning chains for known correct labels.
+include_qa_answer: true
+allow_missing_datasets: false
+hf_cache_dir:

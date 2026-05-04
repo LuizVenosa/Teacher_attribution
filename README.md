@@ -119,3 +119,26 @@ The negatives are wrong-teacher responses to the same prompt. That is the main g
 - Accuracy vs prompt set size using mean pooling.
 
 Save the latent-structure branch and Set Transformer for later ablations.
+## One-command SLURM Pipeline
+
+On the cluster, after installing the environment and setting up Hugging Face access, run:
+
+```bash
+cd /home/3191856/NLP_project/Teacher_attribution
+bash scripts/submit_slurm_pipeline.sh
+```
+
+The script regenerates the prompt bank, submits each SLURM stage, waits for it to finish, then submits the next stage. This avoids the student QoS submit-limit problem caused by queueing the whole dependency graph at once.
+
+Useful variants:
+
+```bash
+# Keep existing prompt files.
+bash scripts/submit_slurm_pipeline.sh --skip-prompts
+
+# Keep existing generated outputs/results instead of moving them to timestamped backups.
+bash scripts/submit_slurm_pipeline.sh --skip-existing-outputs
+
+# Smaller end-to-end smoke run.
+bash scripts/submit_slurm_pipeline.sh --distill-size 20 --train-size 20 --val-size 8 --test-size 8
+```
