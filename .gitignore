@@ -35,3 +35,6 @@ results/**
 Thumbs.db
 .vscode/
 .idea/
+
+# Downloaded source datasets
+external_datasets/

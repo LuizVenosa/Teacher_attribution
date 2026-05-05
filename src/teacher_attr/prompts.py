@@ -4,6 +4,7 @@ import math
 import random
 import re
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Callable
 
 
@@ -90,9 +91,72 @@ class WTYTPromptConfig:
     seed: int
     datasets: tuple[str, ...] = tuple(WHO_TAUGHT_YOU_THAT_DATASETS)
     cache_dir: str | None = None
+    local_data_dir: str | None = None
     max_input_chars: int = 6000
     include_qa_answer: bool = True
     allow_missing_datasets: bool = False
+
+
+def who_taught_you_that_dataset_specs() -> list[dict[str, Any]]:
+    """Return the HF/local dataset definitions used by the prompt-bank pipeline."""
+    return [
+        {
+            "name": "cnn_dailymail",
+            "task": "summarization",
+            "candidates": [("cnn_dailymail", "3.0.0")],
+            "split_map": {"distill": "train", "train": "train", "val": "validation", "test": "test"},
+        },
+        {
+            "name": "sumpubmed",
+            "task": "summarization",
+            "candidates": [
+                ("ccdv/pubmed-summarization", "section"),
+                ("ccdv/pubmed-summarization", "document"),
+                ("scientific_papers", "pubmed"),
+                ("allenai/scientific_papers", "pubmed"),
+            ],
+            "split_map": {"distill": "train", "train": "train", "val": "validation", "test": "test"},
+        },
+        {
+            "name": "rotten_tomatoes",
+            "task": "summarization",
+            "candidates": [
+                ("contemmcm/rotten_tomatoes", "original"),
+                ("cornell-movie-review-data/rotten_tomatoes", None),
+                ("rotten_tomatoes", None),
+            ],
+            "split_map": {
+                "distill": ["complete", "train"],
+                "train": ["complete", "train"],
+                "val": ["complete", "validation"],
+                "test": ["complete", "test"],
+            },
+        },
+        {
+            "name": "commonsenseqa",
+            "task": "qa",
+            "candidates": [("tau/commonsense_qa", None), ("commonsense_qa", None)],
+            "split_map": {"distill": "train", "train": "train", "val": "validation", "test": "validation"},
+        },
+        {
+            "name": "openbookqa",
+            "task": "qa",
+            "candidates": [("allenai/openbookqa", "main"), ("openbookqa", "main")],
+            "split_map": {"distill": "train", "train": "train", "val": "validation", "test": "test"},
+        },
+        {
+            "name": "quarel",
+            "task": "qa",
+            "candidates": [("quarel", None), ("allenai/quarel", None)],
+            "split_map": {"distill": "train", "train": "train", "val": "validation", "test": "test"},
+        },
+        {
+            "name": "alpaca",
+            "task": "instruction_following",
+            "candidates": [("tatsu-lab/alpaca", None)],
+            "split_map": {"distill": "train", "train": "train", "val": "train", "test": "train"},
+        },
+    ]
 
 
 def make_prompt_rows(config: PromptBankConfig) -> list[dict[str, str]]:
@@ -121,13 +185,7 @@ def make_prompt_rows(config: PromptBankConfig) -> list[dict[str, str]]:
 
 
 def make_who_taught_you_that_prompt_rows(config: WTYTPromptConfig) -> list[dict[str, Any]]:
-    """Build prompt rows from the datasets used in Wadhwa et al. (2025).
-
-    The paper evaluates teacher tracing on summarization, QA, and instruction-following
-    using CNN-DailyMail, SumPubMed/PubMed, Rotten Tomatoes, CommonsenseQA,
-    OpenBookQA, QuaRel, and Alpaca. This function turns those examples into the
-    project's shared prompt JSONL schema.
-    """
+    """Build prompt rows from the datasets used in Wadhwa et al. (2025)."""
     if config.size <= 0:
         return []
 
@@ -149,6 +207,7 @@ def make_who_taught_you_that_prompt_rows(config: WTYTPromptConfig) -> list[dict[
                 size=target_per_dataset,
                 seed=config.seed + dataset_idx * 1009,
                 cache_dir=config.cache_dir,
+                local_data_dir=config.local_data_dir,
             )
             pools.append(pool)
         except Exception as exc:
@@ -180,85 +239,36 @@ def make_who_taught_you_that_prompt_rows(config: WTYTPromptConfig) -> list[dict[
 
 def _wtyt_specs(config: WTYTPromptConfig) -> list[dict[str, Any]]:
     max_chars = config.max_input_chars
-    return [
-        {
-            "name": "cnn_dailymail",
-            "task": "summarization",
-            "candidates": [("cnn_dailymail", "3.0.0")],
-            "split_map": {"distill": "train", "train": "train", "val": "validation", "test": "test"},
-            "formatter": lambda row: _format_cnn_dailymail(row, max_chars),
-        },
-        {
-            "name": "sumpubmed",
-            "task": "summarization",
-            "candidates": [
-                ("ccdv/pubmed-summarization", None),
-                ("scientific_papers", "pubmed"),
-                ("allenai/scientific_papers", "pubmed"),
-            ],
-            "split_map": {"distill": "train", "train": "train", "val": "validation", "test": "test"},
-            "formatter": lambda row: _format_pubmed(row, max_chars),
-        },
-        {
-            "name": "rotten_tomatoes",
-            "task": "summarization",
-            "candidates": [
-                ("contemmcm/rotten_tomatoes", "original"),
-                ("cornell-movie-review-data/rotten_tomatoes", None),
-                ("rotten_tomatoes", None),
-            ],
-            "split_map": {
-                "distill": ["complete", "train"],
-                "train": ["complete", "train"],
-                "val": ["complete", "validation"],
-                "test": ["complete", "test"],
-            },
-            "formatter": lambda row: _format_rotten_tomatoes(row, max_chars),
-        },
-        {
-            "name": "commonsenseqa",
-            "task": "qa",
-            "candidates": [("commonsense_qa", None), ("tau/commonsense_qa", None)],
-            "split_map": {"distill": "train", "train": "train", "val": "validation", "test": "validation"},
-            "formatter": lambda row: _format_multiple_choice(
-                row,
-                question_keys=("question",),
-                include_answer=config.include_qa_answer,
-                max_chars=max_chars,
-            ),
-        },
-        {
-            "name": "openbookqa",
-            "task": "qa",
-            "candidates": [("allenai/openbookqa", "main"), ("openbookqa", "main")],
-            "split_map": {"distill": "train", "train": "train", "val": "validation", "test": "test"},
-            "formatter": lambda row: _format_multiple_choice(
-                row,
-                question_keys=("question_stem", "question"),
-                include_answer=config.include_qa_answer,
-                max_chars=max_chars,
-            ),
-        },
-        {
-            "name": "quarel",
-            "task": "qa",
-            "candidates": [("allenai/quarel", None), ("quarel", None)],
-            "split_map": {"distill": "train", "train": "train", "val": "validation", "test": "test"},
-            "formatter": lambda row: _format_multiple_choice(
-                row,
-                question_keys=("question", "question_text"),
-                include_answer=config.include_qa_answer,
-                max_chars=max_chars,
-            ),
-        },
-        {
-            "name": "alpaca",
-            "task": "instruction_following",
-            "candidates": [("tatsu-lab/alpaca", None)],
-            "split_map": {"distill": "train", "train": "train", "val": "train", "test": "train"},
-            "formatter": lambda row: _format_alpaca(row, max_chars),
-        },
-    ]
+    formatters = {
+        "cnn_dailymail": lambda row: _format_cnn_dailymail(row, max_chars),
+        "sumpubmed": lambda row: _format_pubmed(row, max_chars),
+        "rotten_tomatoes": lambda row: _format_rotten_tomatoes(row, max_chars),
+        "commonsenseqa": lambda row: _format_multiple_choice(
+            row,
+            question_keys=("question",),
+            include_answer=config.include_qa_answer,
+            max_chars=max_chars,
+        ),
+        "openbookqa": lambda row: _format_multiple_choice(
+            row,
+            question_keys=("question_stem", "question"),
+            include_answer=config.include_qa_answer,
+            max_chars=max_chars,
+        ),
+        "quarel": lambda row: _format_multiple_choice(
+            row,
+            question_keys=("question", "question_text"),
+            include_answer=config.include_qa_answer,
+            max_chars=max_chars,
+        ),
+        "alpaca": lambda row: _format_alpaca(row, max_chars),
+    }
+    specs = []
+    for spec in who_taught_you_that_dataset_specs():
+        spec = dict(spec)
+        spec["formatter"] = formatters[spec["name"]]
+        specs.append(spec)
+    return specs
 
 
 def _rows_from_wtyt_dataset(
@@ -267,12 +277,17 @@ def _rows_from_wtyt_dataset(
     size: int,
     seed: int,
     cache_dir: str | None,
+    local_data_dir: str | None,
 ) -> list[dict[str, Any]]:
-    dataset, source_name, source_split = _load_first_available_dataset(
-        spec["candidates"],
-        _candidate_splits(spec, split),
-        cache_dir,
-    )
+    candidate_splits = _candidate_splits(spec, split)
+    if local_data_dir:
+        dataset, source_name, source_split = _load_local_wtyt_dataset(
+            spec["name"], candidate_splits, local_data_dir
+        )
+    else:
+        dataset, source_name, source_split = _load_first_available_dataset(
+            spec["candidates"], candidate_splits, cache_dir
+        )
     indexes = _sample_indexes(len(dataset), size=size, seed=seed, offset=_split_offset(split))
     rows: list[dict[str, Any]] = []
     formatter: Callable[[dict[str, Any]], str | None] = spec["formatter"]
@@ -324,6 +339,26 @@ def _load_first_available_dataset(
     raise RuntimeError("; ".join(errors[-4:]))
 
 
+def _load_local_wtyt_dataset(dataset_name: str, splits: list[str], local_data_dir: str):
+    from datasets import load_dataset
+
+    root = Path(local_data_dir) / dataset_name
+    errors: list[str] = []
+    for split in splits:
+        for extension, loader in (("parquet", "parquet"), ("csv", "csv")):
+            path = root / f"{split}.{extension}"
+            if not path.exists():
+                continue
+            try:
+                dataset = load_dataset(loader, data_files=str(path), split="train")
+                return dataset, f"local:{dataset_name}", split
+            except Exception as exc:
+                errors.append(f"{path}: {exc}")
+    searched = ", ".join(str(root / f"{split}.parquet") for split in splits)
+    searched += "; " + ", ".join(str(root / f"{split}.csv") for split in splits)
+    raise FileNotFoundError(f"No local files found for {dataset_name}; searched {searched}. {'; '.join(errors)}")
+
+
 def _candidate_splits(spec: dict[str, Any], project_split: str) -> list[str]:
     split_value = spec.get("split_map", {}).get(project_split, project_split)
     if isinstance(split_value, str):
@@ -354,7 +389,10 @@ def _format_cnn_dailymail(row: dict[str, Any], max_chars: int) -> str | None:
 
 
 def _format_pubmed(row: dict[str, Any], max_chars: int) -> str | None:
-    article = _clean_text(_first_nonempty(row, "article", "document", "text", "body"), max_chars)
+    article = _clean_text(
+        _first_nonempty(row, "article", "document", "text", "body", "abstract", "sections"),
+        max_chars,
+    )
     if not article:
         return None
     return "Write a concise biomedical abstract-style summary of the following PubMed article.\n\nArticle:\n" + article
@@ -445,6 +483,8 @@ def _clean_text(value: Any, max_chars: int) -> str:
         return ""
     if isinstance(value, list):
         value = "\n".join(str(item) for item in value)
+    if isinstance(value, dict):
+        value = "\n".join(str(item) for item in value.values())
     text = re.sub(r"\s+", " ", str(value)).strip()
     if len(text) > max_chars:
         text = text[:max_chars].rsplit(" ", 1)[0].strip()

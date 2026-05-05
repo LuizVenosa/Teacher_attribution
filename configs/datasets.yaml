@@ -18,3 +18,4 @@ max_input_chars: 6000
 include_qa_answer: true
 allow_missing_datasets: false
 hf_cache_dir:
+local_data_dir: external_datasets/who_taught_you_that

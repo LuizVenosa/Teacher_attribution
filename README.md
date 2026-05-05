@@ -153,3 +153,39 @@ Tiny SLURM-batched smoke run:
 ```bash
 sbatch jobs/00_run_pipeline.sbatch --distill-size 20 --train-size 20 --val-size 8 --test-size 8
 ```
+## Offline Dataset Download
+
+To avoid downloading Hugging Face datasets on the cluster login node, download the paper datasets to local files first:
+
+```bash
+PYTHONPATH=src python scripts/download_wtyt_datasets.py \
+  --output-dir external_datasets/who_taught_you_that \
+  --datasets cnn_dailymail,sumpubmed,rotten_tomatoes,commonsenseqa,openbookqa,alpaca \
+  --format auto \
+  --allow-missing-datasets
+```
+
+`--format auto` writes Parquet when `pyarrow` is available, otherwise CSV. The prompt builder will read either format from the same directory layout:
+
+```text
+external_datasets/who_taught_you_that/
+  cnn_dailymail/train.parquet
+  cnn_dailymail/validation.parquet
+  cnn_dailymail/test.parquet
+  ...
+```
+
+Then build prompts without touching the HF Hub:
+
+```bash
+PYTHONPATH=src python scripts/make_prompt_bank.py \
+  --source who_taught_you_that \
+  --local-data-dir external_datasets/who_taught_you_that \
+  --datasets cnn_dailymail,sumpubmed,rotten_tomatoes,commonsenseqa,openbookqa,alpaca \
+  --distill-size 2000 \
+  --train-size 2000 \
+  --val-size 600 \
+  --test-size 600
+```
+
+Upload only `external_datasets/who_taught_you_that/` and `data/prompts/` to the cluster. The SLURM pipeline uses `external_datasets/who_taught_you_that` automatically when that folder exists.

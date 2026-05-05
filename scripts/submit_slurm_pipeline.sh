@@ -12,6 +12,7 @@ cd "$PROJECT_ROOT"
 SOURCE="who_taught_you_that"
 DATASETS=""
 ALLOW_MISSING_DATASETS=0
+LOCAL_DATA_DIR="external_datasets/who_taught_you_that"
 DISTILL_SIZE=1000
 TRAIN_SIZE=1000
 VAL_SIZE=300
@@ -30,6 +31,7 @@ Options:
   --source NAME              Prompt source: synthetic or who_taught_you_that [$SOURCE]
   --datasets LIST            Comma-separated WTYT dataset subset [all paper datasets]
   --allow-missing-datasets   Skip unavailable HF datasets instead of failing
+  --local-data-dir DIR       Use locally downloaded parquet/csv datasets [$LOCAL_DATA_DIR]
   --distill-size N           Distillation prompt count [$DISTILL_SIZE]
   --train-size N             Attribution train prompt count [$TRAIN_SIZE]
   --val-size N               Attribution val prompt count [$VAL_SIZE]
@@ -59,6 +61,8 @@ while [[ $# -gt 0 ]]; do
       DATASETS="$2"; shift 2 ;;
     --allow-missing-datasets)
       ALLOW_MISSING_DATASETS=1; shift ;;
+    --local-data-dir)
+      LOCAL_DATA_DIR="$2"; shift 2 ;;
     --distill-size)
       DISTILL_SIZE="$2"; shift 2 ;;
     --train-size)
@@ -169,6 +173,9 @@ if [[ "$SKIP_PROMPTS" -eq 0 ]]; then
   fi
   if [[ "$ALLOW_MISSING_DATASETS" -eq 1 ]]; then
     prompt_args+=(--allow-missing-datasets)
+  fi
+  if [[ -n "$LOCAL_DATA_DIR" && -d "$LOCAL_DATA_DIR" ]]; then
+    prompt_args+=(--local-data-dir "$LOCAL_DATA_DIR")
   fi
   PYTHONPATH=src python scripts/make_prompt_bank.py "${prompt_args[@]}"
 fi

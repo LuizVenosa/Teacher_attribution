@@ -29,6 +29,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--test-size", type=int, default=300)
     parser.add_argument("--max-input-chars", type=int, default=None)
     parser.add_argument("--hf-cache-dir", default=None)
+    parser.add_argument("--local-data-dir", default=None, help="Directory with downloaded WTYT parquet/csv files.")
     parser.add_argument("--include-qa-answer", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument("--allow-missing-datasets", action="store_true")
     parser.add_argument("--seed", type=int, default=13)
@@ -58,12 +59,14 @@ def main() -> None:
         )
         allow_missing = args.allow_missing_datasets or dataset_cfg.get("allow_missing_datasets", False)
         cache_dir = args.hf_cache_dir or dataset_cfg.get("hf_cache_dir")
+        local_data_dir = args.local_data_dir or dataset_cfg.get("local_data_dir")
     else:
         selected_datasets = []
         max_input_chars = 6000
         include_qa_answer = True
         allow_missing = False
         cache_dir = None
+        local_data_dir = None
 
     for split_idx, (split, size) in enumerate(split_sizes.items()):
         if args.source == "who_taught_you_that":
@@ -74,6 +77,7 @@ def main() -> None:
                     seed=args.seed + split_idx * 997,
                     datasets=tuple(selected_datasets),
                     cache_dir=cache_dir,
+                    local_data_dir=local_data_dir,
                     max_input_chars=max_input_chars,
                     include_qa_answer=include_qa_answer,
                     allow_missing_datasets=allow_missing,
