@@ -1,161 +1,157 @@
 # Teacher Attribution
 
-Prompt-conditioned contrastive attribution for distilled language-model students.
+Prompt-conditioned contrastive attribution for **public teacher-student language-model pairs**.
 
-The core experiment is simple:
+This version skips student distillation. Instead, it uses existing public student models whose model cards document a teacher or source model. For each shared prompt, the pipeline generates:
 
-1. Build a shared prompt bank.
-2. Generate outputs from a closed set of teacher models.
-3. Distill one LoRA student per teacher.
-4. Generate student outputs on shared attribution prompts.
-5. Build JSONL attribution pairs with same-prompt teacher candidates.
-6. Run lexical and embedding baselines.
-7. Train a shared prompt-response encoder with InfoNCE plus a teacher-ID head.
-8. Evaluate single-prompt and set-level attribution.
+```text
+candidate teacher responses
+public student response
+true teacher label from the documented lineage
+```
 
-Everything is JSONL. Heavy steps are SLURM batch jobs. Notebooks are optional scratch work, not the pipeline.
+Then it trains and evaluates a contrastive prompt-response encoder that pulls each student response toward its documented teacher response and pushes it away from other same-prompt teacher responses.
+
+## Public Lineage Pairs
+
+| Teacher ID | Teacher model | Student ID | Student model | Evidence level |
+|---|---|---|---|---|
+| `gpt2` | `gpt2` | `distilgpt2` | `distilbert/distilgpt2` | High: DistilGPT2 model card says it was supervised by GPT-2 124M. |
+| `qwen15_18b` | `Qwen/Qwen1.5-1.8B` | `miniplm_qwen_200m` | `MiniLLM/MiniPLM-Qwen-200M` | High: MiniPLM card/dataset metadata names Qwen1.5-1.8B as teacher. |
+| `flan_t5_base` | `google/flan-t5-base` | `lamini_flan_t5_248m` | `MBZUAI/LaMini-Flan-T5-248M` | Medium: Flan-T5-base family / instruction-distilled lineage. |
+| `qwen3_4b` | `Qwen/Qwen3-4B` | `qwen3_06b_distilled` | `Yahhhh/qwen3-0.6b-distilled` | Medium-low: community card names Qwen3-4B as teacher. |
+
+The model list lives in `configs/public_lineage_models.yaml`.
+
+## Pipeline
+
+```text
+1. Build a shared prompt bank
+2. Generate responses from public teacher models
+3. Generate responses from public student models
+4. Build attribution JSONL pairs
+5. Run lexical and embedding baselines
+6. Train the contrastive attribution encoder
+7. Evaluate single-prompt and set-level attribution
+```
+
+There is no `make_sft_data.py`, no LoRA student training, and no generated student checkpoints.
 
 ## Setup
 
 ```bash
-cd /scratch/$USER
-git clone git@github.com:YOUR_USERNAME/teacher-attribution.git
-cd teacher-attribution
-
+git clone git@github.com:LuizVenosa/Teacher_attribution.git
+cd Teacher_attribution
 python -m venv .venv
 source .venv/bin/activate
-pip install -e ".[generation]"
+pip install -e .
 ```
 
-On HPC jobs, keep caches on scratch:
+For Bocconi HPC jobs, `jobs/00_setup_env.sh` loads `miniconda3`, CUDA, activates `teacherattr`, keeps Hugging Face caches inside the project by default, and reads an optional private Hugging Face token from `~/.hf_token`.
+
+## Build Prompts
+
+Use the Who Taught You That style task sources:
 
 ```bash
-export HF_HOME=/scratch/$USER/hf_cache
-export TRANSFORMERS_CACHE=/scratch/$USER/hf_cache
-export HF_DATASETS_CACHE=/scratch/$USER/hf_cache/datasets
-export WANDB_DIR=/scratch/$USER/wandb
+PYTHONPATH=src python scripts/make_prompt_bank.py \
+  --source who_taught_you_that \
+  --datasets commonsenseqa,openbookqa,alpaca,rotten_tomatoes \
+  --train-size 1000 \
+  --val-size 300 \
+  --test-size 300 \
+  --allow-missing-datasets
 ```
 
-## Local Smoke Pipeline
-
-This creates a small prompt bank and validates the CPU-only stages.
+For a tiny smoke test:
 
 ```bash
-python scripts/make_prompt_bank.py --distill-size 20 --train-size 20 --val-size 8 --test-size 8
-python scripts/make_sft_data.py \
-  --teacher_outputs data/teacher_outputs/qwen_distill.jsonl \
-  --output data/distill_data/qwen_teacher_sft.jsonl
+PYTHONPATH=src python scripts/make_prompt_bank.py \
+  --source synthetic \
+  --train-size 32 \
+  --val-size 16 \
+  --test-size 16
 ```
 
-The generation and training scripts require model downloads and usually belong on GPU nodes.
-
-## HPC Execution
+## Cluster Execution
 
 ```bash
+cd /home/3191856/NLP_project/Teacher_attribution
 mkdir -p logs
 
-# Prompt bank can run on the login node.
-python scripts/make_prompt_bank.py
+# 1. Generate public teacher and public student outputs. No arrays.
+sbatch jobs/01_generate_public_lineage_outputs.sbatch
 
-# Teacher outputs for distill/train/val/test.
-sbatch jobs/01_generate_teachers.sbatch
+# 2. Build train/val/test attribution pair files.
+sbatch jobs/04_build_public_lineage_attribution.sbatch
 
-# One LoRA student per teacher.
-sbatch jobs/02_distill_student.sbatch
+# 3. Run baselines.
+sbatch jobs/06_eval_public_lineage.sbatch baselines
 
-# Student outputs for attribution train/val/test.
-sbatch jobs/03_generate_students.sbatch
+# 4. Train contrastive encoder.
+sbatch jobs/05_train_public_lineage_contrastive.sbatch
 
-# Build train/val/test attribution JSONL.
-sbatch jobs/04_build_attribution_data.sbatch
-
-# Baselines.
-sbatch jobs/06_eval.sbatch baselines
-
-# Contrastive encoder.
-sbatch jobs/05_train_contrastive.sbatch
-
-# Encoder evaluation with set-size curves.
-sbatch jobs/06_eval.sbatch encoder
+# 5. Evaluate set-level attribution.
+sbatch jobs/06_eval_public_lineage.sbatch encoder
 ```
 
-## Key Files
+Outputs from teacher/student generation are stored separately from older experiments:
 
-- `configs/models.yaml`: teacher models, student base, attribution encoder, label map.
-- `configs/generation.yaml`: decoding settings for teacher and student generation.
-- `configs/distill.yaml`: LoRA and SFT settings.
-- `configs/attribution.yaml`: contrastive encoder training settings.
-- `data/attribution/train_pairs.jsonl`: main InfoNCE training file.
-- `results/contrastive/set_level_metrics.json`: accuracy by number of prompts.
+```text
+data/public_lineage/teacher_outputs/
+data/public_lineage/student_outputs/
+```
+
+Attribution files are written to:
+
+```text
+data/attribution/train_pairs.jsonl
+data/attribution/val_pairs.jsonl
+data/attribution/test_pairs.jsonl
+```
+
+## Smoke Runs
+
+Restrict generation to two lightweight pairs:
+
+```bash
+TEACHER_LIST="gpt2 qwen15_18b" \
+STUDENT_LIST="distilgpt2:miniplm_qwen_200m" \
+SPLIT_LIST="train val test" \
+sbatch jobs/01_generate_public_lineage_outputs.sbatch
+```
+
+Run only one split:
+
+```bash
+SPLIT_LIST="test" sbatch jobs/01_generate_public_lineage_outputs.sbatch
+SPLIT_LIST="test" sbatch jobs/04_build_public_lineage_attribution.sbatch
+```
 
 ## Attribution Pair Schema
 
 ```json
 {
   "prompt_id": "qa_000001",
-  "anchor_student_id": "student_from_qwen",
-  "true_teacher": "qwen",
+  "anchor_student_id": "student_from_gpt2",
+  "true_teacher": "gpt2",
   "prompt": "Why do objects fall at the same rate in a vacuum?",
-  "student_response": "In a vacuum, there is no air resistance...",
+  "student_response": "In a vacuum, objects fall at the same rate because...",
   "teacher_responses": {
-    "qwen": "Objects fall at the same rate in a vacuum because...",
-    "llama": "...",
-    "mistral": "...",
-    "gemma": "..."
+    "gpt2": "Objects fall because...",
+    "qwen15_18b": "In a vacuum, gravitational acceleration...",
+    "flan_t5_base": "Objects fall at the same rate because...",
+    "qwen3_4b": "Without air resistance..."
   },
   "label": 0
 }
 ```
 
-The negatives are wrong-teacher responses to the same prompt. That is the main guardrail against topic leakage.
+The negatives are wrong-teacher responses to the **same prompt**, which is the main guardrail against topic leakage.
 
-## Minimal First Milestone
-
-- 4 teachers.
-- 1 shared student base.
-- LoRA students only.
-- TF-IDF, sentence-embedding, and POS-template baselines.
-- Single-response contrastive encoder.
-- Accuracy vs prompt set size using mean pooling.
-
-Save the latent-structure branch and Set Transformer for later ablations.
-## One-command SLURM Pipeline
-
-On the cluster, after installing the environment and setting up Hugging Face access, run:
-
-```bash
-cd /home/3191856/NLP_project/Teacher_attribution
-bash scripts/submit_slurm_pipeline.sh
-```
-
-The script regenerates the prompt bank, submits each SLURM stage, waits for it to finish, then submits the next stage. This avoids the student QoS submit-limit problem caused by queueing the whole dependency graph at once.
-
-Useful variants:
-
-```bash
-# Keep existing prompt files.
-bash scripts/submit_slurm_pipeline.sh --skip-prompts
-
-# Keep existing generated outputs/results instead of moving them to timestamped backups.
-bash scripts/submit_slurm_pipeline.sh --skip-existing-outputs
-
-# Smaller end-to-end smoke run.
-bash scripts/submit_slurm_pipeline.sh --distill-size 20 --train-size 20 --val-size 8 --test-size 8
-```
-Submit the orchestrator itself through SLURM:
-
-```bash
-sbatch jobs/00_run_pipeline.sbatch
-```
-
-Tiny SLURM-batched smoke run:
-
-```bash
-sbatch jobs/00_run_pipeline.sbatch --distill-size 20 --train-size 20 --val-size 8 --test-size 8
-```
 ## Offline Dataset Download
 
-To avoid downloading Hugging Face datasets on the cluster login node, download the paper datasets to local files first:
+If Hugging Face dataset downloads are painful on the cluster, download them elsewhere first:
 
 ```bash
 PYTHONPATH=src python scripts/download_wtyt_datasets.py \
@@ -165,27 +161,27 @@ PYTHONPATH=src python scripts/download_wtyt_datasets.py \
   --allow-missing-datasets
 ```
 
-`--format auto` writes Parquet when `pyarrow` is available, otherwise CSV. The prompt builder will read either format from the same directory layout:
-
-```text
-external_datasets/who_taught_you_that/
-  cnn_dailymail/train.parquet
-  cnn_dailymail/validation.parquet
-  cnn_dailymail/test.parquet
-  ...
-```
-
-Then build prompts without touching the HF Hub:
+Then build prompts from local Parquet/CSV:
 
 ```bash
 PYTHONPATH=src python scripts/make_prompt_bank.py \
   --source who_taught_you_that \
   --local-data-dir external_datasets/who_taught_you_that \
-  --datasets cnn_dailymail,sumpubmed,rotten_tomatoes,commonsenseqa,openbookqa,alpaca \
-  --distill-size 2000 \
-  --train-size 2000 \
-  --val-size 600 \
-  --test-size 600
+  --datasets commonsenseqa,openbookqa,alpaca,rotten_tomatoes \
+  --train-size 1000 \
+  --val-size 300 \
+  --test-size 300 \
+  --allow-missing-datasets
 ```
 
-Upload only `external_datasets/who_taught_you_that/` and `data/prompts/` to the cluster. The SLURM pipeline uses `external_datasets/who_taught_you_that` automatically when that folder exists.
+## Key Files
+
+- `configs/public_lineage_models.yaml`: public teacher/student pairs and labels.
+- `configs/public_lineage_generation.yaml`: decoding settings for public teachers/students.
+- `configs/public_lineage_attribution.yaml`: contrastive encoder training settings.
+- `scripts/generate_public_teachers.py`: teacher response generation.
+- `scripts/generate_public_students.py`: public student response generation.
+- `scripts/build_attribution_pairs.py`: alignment into InfoNCE rows.
+- `scripts/run_baselines.py`: TF-IDF, sentence embedding, POS, and classifier baselines.
+- `scripts/train_contrastive_encoder.py`: prompt-conditioned InfoNCE encoder.
+- `scripts/evaluate.py`: set-level attribution evaluation.

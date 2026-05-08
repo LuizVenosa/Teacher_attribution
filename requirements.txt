@@ -3,7 +3,7 @@ datasets
 evaluate
 numpy
 pandas
-peft
+pyarrow
 pyyaml
 scikit-learn
 sentence-transformers
@@ -11,7 +11,3 @@ spacy
 torch
 tqdm
 transformers
-trl
-vllm
-wandb
-pyarrow
