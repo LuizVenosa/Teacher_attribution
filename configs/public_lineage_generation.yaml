@@ -3,4 +3,4 @@ temperature: 0.7
 top_p: 0.9
 batch_size: 8
 dtype: float16
-trust_remote_code: true
+trust_remote_code: false

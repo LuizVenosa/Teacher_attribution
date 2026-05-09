@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Any
 
 import torch
@@ -34,11 +35,24 @@ def render_prompt(tokenizer: Any, prompt: str, prompt_format: str) -> str:
     raise ValueError(f"Unsupported prompt_format: {prompt_format}")
 
 
+def offline_mode() -> bool:
+    return os.environ.get("HF_HUB_OFFLINE") == "1" or os.environ.get("TRANSFORMERS_OFFLINE") == "1"
+
+
 def load_text_generation_model(model_name: str, dtype: str | None, trust_remote_code: bool):
     from transformers import AutoConfig, AutoModelForCausalLM, AutoModelForSeq2SeqLM, AutoTokenizer
 
-    config = AutoConfig.from_pretrained(model_name, trust_remote_code=trust_remote_code)
-    tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=trust_remote_code)
+    local_files_only = offline_mode()
+    config = AutoConfig.from_pretrained(
+        model_name,
+        trust_remote_code=trust_remote_code,
+        local_files_only=local_files_only,
+    )
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_name,
+        trust_remote_code=trust_remote_code,
+        local_files_only=local_files_only,
+    )
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "left"
@@ -49,6 +63,7 @@ def load_text_generation_model(model_name: str, dtype: str | None, trust_remote_
         torch_dtype=torch_dtype_from_config(dtype),
         trust_remote_code=trust_remote_code,
         device_map="auto",
+        local_files_only=local_files_only,
     )
     model.eval()
     return model, tokenizer, getattr(config, "is_encoder_decoder", False)
