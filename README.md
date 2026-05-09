@@ -51,16 +51,16 @@ For Bocconi HPC jobs, `jobs/00_setup_env.sh` loads `miniconda3`, CUDA, activates
 
 ## Build Prompts
 
-Use the Who Taught You That style task sources:
+Use the strict Who Taught You That task-source mix from local Parquet/CSV files:
 
 ```bash
 PYTHONPATH=src python scripts/make_prompt_bank.py \
   --source who_taught_you_that \
-  --datasets commonsenseqa,openbookqa,alpaca,rotten_tomatoes \
-  --train-size 1000 \
-  --val-size 300 \
-  --test-size 300 \
-  --allow-missing-datasets
+  --local-data-dir external_datasets/who_taught_you_that \
+  --datasets cnn_dailymail,sumpubmed,rotten_tomatoes,commonsenseqa,openbookqa,quarel,alpaca \
+  --train-size 13377 \
+  --val-size 1946 \
+  --test-size 3500
 ```
 
 For a tiny smoke test:
@@ -95,6 +95,49 @@ sbatch jobs/05_train_public_lineage_contrastive.sbatch
 sbatch jobs/06_eval_public_lineage.sbatch encoder
 ```
 
+## Who Taught You That Comparability
+
+To make the results comparable to *Who Taught You That?*, report two tracks:
+
+1. **WTYT-style protocol results**: same broad task families, same student-response-only attribution setting, same support-size curves, and text-feature baselines.
+2. **Our contrastive extension**: same data splits and lineage labels, but with prompt-conditioned same-prompt teacher negatives and learned embeddings.
+
+The important caveat is that this repo uses **public documented lineage pairs** instead of training every student from scratch on teacher outputs. That makes the protocol comparable, but the student construction is not identical to the paper's controlled distillation setup.
+
+For the closest WTYT-style table, build prompts with the full dataset mix:
+
+```bash
+PYTHONPATH=src python scripts/make_prompt_bank.py \
+  --source who_taught_you_that \
+  --local-data-dir external_datasets/who_taught_you_that \
+  --datasets cnn_dailymail,sumpubmed,rotten_tomatoes,commonsenseqa,openbookqa,quarel,alpaca \
+  --train-size 13377 \
+  --val-size 1946 \
+  --test-size 3500
+```
+
+This uses a balanced maximum across all seven WTYT task sources, so QuaRel and OpenBookQA do not disappear under the much larger summarization/review datasets.
+
+Then run the WTYT-style evaluator:
+
+```bash
+sbatch jobs/07_eval_wtyt_style.sbatch
+```
+
+It reports BoW, 1-4 gram, and POS-template classifiers over support sizes:
+
+```text
+50, 200, 1000, 2000
+```
+
+Outputs:
+
+```text
+results/wtyt_style/public_lineage_wtyt_style_metrics.json
+results/wtyt_style/public_lineage_wtyt_style_metrics.csv
+```
+
+Use these as the directly comparable baseline table. Use the contrastive encoder results as the proposed-method table.
 Outputs from teacher/student generation are stored separately from older experiments:
 
 ```text
@@ -156,7 +199,7 @@ If Hugging Face dataset downloads are painful on the cluster, download them else
 ```bash
 PYTHONPATH=src python scripts/download_wtyt_datasets.py \
   --output-dir external_datasets/who_taught_you_that \
-  --datasets cnn_dailymail,sumpubmed,rotten_tomatoes,commonsenseqa,openbookqa,alpaca \
+  --datasets cnn_dailymail,sumpubmed,rotten_tomatoes,commonsenseqa,openbookqa,quarel,alpaca \
   --format auto \
   --allow-missing-datasets
 ```

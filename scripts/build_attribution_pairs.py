@@ -8,6 +8,17 @@ from teacher_attr.io import load_jsonl, load_yaml, write_jsonl
 from teacher_attr.utils import setup_logging, teacher_order_from_config
 
 
+KNOWN_SOURCE_DATASETS = [
+    "cnn_dailymail",
+    "sumpubmed",
+    "rotten_tomatoes",
+    "commonsenseqa",
+    "openbookqa",
+    "quarel",
+    "alpaca",
+]
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Align student and teacher outputs into InfoNCE rows.")
     parser.add_argument("--models_config", required=True)
@@ -31,6 +42,13 @@ def load_teacher_outputs(
         by_teacher[teacher_id] = {row["prompt_id"]: row for row in rows}
         logging.info("Loaded %d teacher rows from %s", len(rows), path)
     return by_teacher
+
+
+def source_dataset_from_prompt_id(prompt_id: str) -> str | None:
+    for name in sorted(KNOWN_SOURCE_DATASETS, key=len, reverse=True):
+        if f"_{name}_" in prompt_id:
+            return name
+    return None
 
 
 def main() -> None:
@@ -70,6 +88,12 @@ def main() -> None:
                         "prompt_id": prompt_id,
                         "task": row.get("task"),
                         "split": row.get("split", args.split),
+                        "source_dataset": row.get("source_dataset")
+                        or source_dataset_from_prompt_id(prompt_id),
+                        "source_hf_dataset": row.get("source_hf_dataset"),
+                        "source_split": row.get("source_split"),
+                        "source_index": row.get("source_index"),
+                        "source_id": row.get("source_id"),
                         "anchor_student_id": row["student_id"],
                         "true_teacher": true_teacher,
                         "prompt": row["prompt"],
