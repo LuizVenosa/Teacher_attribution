@@ -21,8 +21,8 @@ source "$SETUP_ROOT/jobs/00_setup_env.sh"
 MODELS_CONFIG="${MODELS_CONFIG:-configs/public_lineage_models.yaml}"
 GENERATION_CONFIG="${GENERATION_CONFIG:-configs/public_lineage_generation.yaml}"
 SPLIT_LIST="${SPLIT_LIST:-train val test}"
-TEACHER_LIST="${TEACHER_LIST:-gpt2 qwen15_18b flan_t5_base qwen3_4b}"
-STUDENT_LIST="${STUDENT_LIST:-distilgpt2:miniplm_qwen_200m:lamini_flan_t5_248m:qwen3_06b_distilled}"
+TEACHER_LIST="${TEACHER_LIST:-gpt2 qwen15_18b flan_t5_base flan_t5_small}"
+STUDENT_LIST="${STUDENT_LIST:-distilgpt2:miniplm_qwen_200m:lamini_flan_t5_248m:lamini_flan_t5_77m}"
 
 read -r -a SPLITS <<< "$SPLIT_LIST"
 read -r -a TEACHERS <<< "$TEACHER_LIST"
@@ -33,7 +33,7 @@ teacher_for_student() {
     distilgpt2) echo "gpt2" ;;
     miniplm_qwen_200m) echo "qwen15_18b" ;;
     lamini_flan_t5_248m) echo "flan_t5_base" ;;
-    qwen3_06b_distilled) echo "qwen3_4b" ;;
+    lamini_flan_t5_77m) echo "flan_t5_small" ;;
     *) echo "Unknown student id: $1" >&2; return 2 ;;
   esac
 }

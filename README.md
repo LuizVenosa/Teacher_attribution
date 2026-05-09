@@ -19,7 +19,7 @@ Then it trains and evaluates a contrastive prompt-response encoder that pulls ea
 | `gpt2` | `gpt2` | `distilgpt2` | `distilbert/distilgpt2` | High: DistilGPT2 model card says it was supervised by GPT-2 124M. |
 | `qwen15_18b` | `Qwen/Qwen1.5-1.8B` | `miniplm_qwen_200m` | `MiniLLM/MiniPLM-Qwen-200M` | High: MiniPLM card/dataset metadata names Qwen1.5-1.8B as teacher. |
 | `flan_t5_base` | `google/flan-t5-base` | `lamini_flan_t5_248m` | `MBZUAI/LaMini-Flan-T5-248M` | Medium: Flan-T5-base family / instruction-distilled lineage. |
-| `qwen3_4b` | `Qwen/Qwen3-4B` | `qwen3_06b_distilled` | `Yahhhh/qwen3-0.6b-distilled` | Medium-low: community card names Qwen3-4B as teacher. |
+| `flan_t5_small` | `google/flan-t5-small` | `lamini_flan_t5_77m` | `MBZUAI/LaMini-Flan-T5-77M` | Medium: Flan-T5-small family / instruction-distilled lineage. |
 
 The model list lives in `configs/public_lineage_models.yaml`.
 
@@ -141,7 +141,7 @@ SPLIT_LIST="test" sbatch jobs/04_build_public_lineage_attribution.sbatch
     "gpt2": "Objects fall because...",
     "qwen15_18b": "In a vacuum, gravitational acceleration...",
     "flan_t5_base": "Objects fall at the same rate because...",
-    "qwen3_4b": "Without air resistance..."
+    "flan_t5_small": "Without air resistance..."
   },
   "label": 0
 }

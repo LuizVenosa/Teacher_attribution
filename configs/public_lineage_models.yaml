@@ -8,9 +8,9 @@ teachers:
   flan_t5_base:
     hf_name: google/flan-t5-base
     prompt_format: text2text
-  qwen3_4b:
-    hf_name: Qwen/Qwen3-4B
-    prompt_format: chat
+  flan_t5_small:
+    hf_name: google/flan-t5-small
+    prompt_format: text2text
 
 public_students:
   distilgpt2:
@@ -28,11 +28,11 @@ public_students:
     true_teacher: flan_t5_base
     prompt_format: text2text
     evidence: "LaMini-Flan-T5-248M is based on / instruction-distilled from Flan-T5-base style training."
-  qwen3_06b_distilled:
-    hf_name: Yahhhh/qwen3-0.6b-distilled
-    true_teacher: qwen3_4b
-    prompt_format: chat
-    evidence: "Model card states Qwen3-0.6B distilled using Qwen3-4B as teacher."
+  lamini_flan_t5_77m:
+    hf_name: MBZUAI/LaMini-Flan-T5-77M
+    true_teacher: flan_t5_small
+    prompt_format: text2text
+    evidence: "LaMini-Flan-T5-77M is the 77M Flan-T5-family instruction-distilled checkpoint."
 
 attribution_encoder:
   hf_name: sentence-transformers/all-MiniLM-L6-v2
@@ -41,4 +41,4 @@ teacher_labels:
   gpt2: 0
   qwen15_18b: 1
   flan_t5_base: 2
-  qwen3_4b: 3
+  flan_t5_small: 3
