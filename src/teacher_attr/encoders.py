@@ -13,13 +13,18 @@ class AttributionEncoder(nn.Module):
         projection_dim: int = 256,
         num_teachers: int = 4,
         trust_remote_code: bool = True,
+        local_files_only: bool = False,
     ):
         super().__init__()
         self.model_name = model_name
         self.projection_dim = projection_dim
         self.num_teachers = num_teachers
 
-        self.backbone = AutoModel.from_pretrained(model_name, trust_remote_code=trust_remote_code)
+        self.backbone = AutoModel.from_pretrained(
+            model_name,
+            trust_remote_code=trust_remote_code,
+            local_files_only=local_files_only,
+        )
         hidden = self.backbone.config.hidden_size
 
         self.proj = nn.Sequential(

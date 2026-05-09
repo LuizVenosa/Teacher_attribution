@@ -31,6 +31,21 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+
+
+def _offline_mode() -> bool:
+    import os
+
+    return os.environ.get("HF_HUB_OFFLINE") == "1" or os.environ.get("TRANSFORMERS_OFFLINE") == "1"
+
+
+def _is_improvement(score: float, best: float, *, mode: str, min_delta: float) -> bool:
+    if mode == "max":
+        return score > best + min_delta
+    if mode == "min":
+        return score < best - min_delta
+    raise ValueError(f"Unsupported early stopping mode: {mode}")
+
 def move_tokens(tokens: dict[str, torch.Tensor], device: torch.device) -> dict[str, torch.Tensor]:
     return {key: value.to(device) for key, value in tokens.items()}
 
@@ -112,7 +127,11 @@ def main() -> None:
     output_dir = Path(attr_cfg["output_dir"])
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_name,
+        trust_remote_code=True,
+        local_files_only=_offline_mode(),
+    )
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token or tokenizer.sep_token or tokenizer.unk_token
 
@@ -144,6 +163,7 @@ def main() -> None:
         model_name=model_name,
         projection_dim=attr_cfg["projection_dim"],
         num_teachers=len(teacher_ids),
+        local_files_only=_offline_mode(),
     ).to(device)
     model.enable_gradient_checkpointing()
     logging.info("Model parameters: %s", count_parameters(model))
@@ -153,16 +173,28 @@ def main() -> None:
         lr=attr_cfg["learning_rate"],
         weight_decay=attr_cfg["weight_decay"],
     )
+    max_epochs = int(attr_cfg.get("max_epochs", attr_cfg["num_epochs"]))
     steps_per_epoch = math.ceil(len(train_loader) / attr_cfg["gradient_accumulation_steps"])
-    total_steps = steps_per_epoch * attr_cfg["num_epochs"]
+    total_steps = steps_per_epoch * max_epochs
     warmup_steps = int(total_steps * attr_cfg["warmup_ratio"])
     scheduler = get_cosine_schedule_with_warmup(optimizer, warmup_steps, total_steps)
 
+    monitor_metric = attr_cfg.get("early_stopping_metric", "accuracy")
+    early_stopping_mode = attr_cfg.get("early_stopping_mode", "max")
+    early_stopping_patience = attr_cfg.get("early_stopping_patience")
+    early_stopping_min_delta = float(attr_cfg.get("early_stopping_min_delta", 0.0))
+    if early_stopping_mode not in {"max", "min"}:
+        raise ValueError(f"Unsupported early_stopping_mode={early_stopping_mode!r}")
+
+    best_score = -math.inf if early_stopping_mode == "max" else math.inf
     best_acc = -1.0
+    best_epoch = 0
+    best_metrics: dict[str, Any] = {}
+    epochs_without_improvement = 0
     history = []
     optimizer.zero_grad(set_to_none=True)
 
-    for epoch in range(1, attr_cfg["num_epochs"] + 1):
+    for epoch in range(1, max_epochs + 1):
         model.train()
         running_loss = 0.0
         progress = tqdm(train_loader, desc=f"epoch {epoch}", dynamic_ncols=True)
@@ -206,7 +238,14 @@ def main() -> None:
             mixed_precision=attr_cfg.get("mixed_precision"),
         )
         history.append({"epoch": epoch, "train_loss": running_loss / len(train_loader), **val_metrics})
-        logging.info("epoch=%d val_accuracy=%.4f", epoch, val_metrics["accuracy"])
+        current_score = float(val_metrics[monitor_metric])
+        logging.info(
+            "epoch=%d val_accuracy=%.4f %s=%.4f",
+            epoch,
+            val_metrics["accuracy"],
+            monitor_metric,
+            current_score,
+        )
 
         save_checkpoint(
             output_dir / "last.pt",
@@ -217,8 +256,18 @@ def main() -> None:
             teacher_ids,
             val_metrics,
         )
-        if val_metrics["accuracy"] > best_acc:
+
+        if _is_improvement(
+            current_score,
+            best_score,
+            mode=early_stopping_mode,
+            min_delta=early_stopping_min_delta,
+        ):
+            best_score = current_score
             best_acc = val_metrics["accuracy"]
+            best_epoch = epoch
+            best_metrics = dict(val_metrics)
+            epochs_without_improvement = 0
             save_checkpoint(
                 output_dir / "best.pt",
                 model,
@@ -228,8 +277,36 @@ def main() -> None:
                 teacher_ids,
                 val_metrics,
             )
+        else:
+            epochs_without_improvement += 1
 
-    save_json(output_dir / "training_metrics.json", {"history": history, "best_accuracy": best_acc})
+        summary = {
+            "history": history,
+            "best_accuracy": best_acc,
+            "best_epoch": best_epoch,
+            "best_score": best_score,
+            "best_metrics": best_metrics,
+            "monitor_metric": monitor_metric,
+            "early_stopping_patience": early_stopping_patience,
+            "early_stopping_min_delta": early_stopping_min_delta,
+            "early_stopped": False,
+            "stopped_epoch": epoch,
+        }
+        save_json(output_dir / "training_metrics.json", summary)
+
+        if early_stopping_patience is not None and epochs_without_improvement >= int(
+            early_stopping_patience
+        ):
+            logging.info(
+                "early stopping at epoch=%d best_epoch=%d best_%s=%.4f",
+                epoch,
+                best_epoch,
+                monitor_metric,
+                best_score,
+            )
+            summary["early_stopped"] = True
+            save_json(output_dir / "training_metrics.json", summary)
+            break
 
 
 if __name__ == "__main__":

@@ -185,3 +185,57 @@ PYTHONPATH=src python scripts/make_prompt_bank.py \
 - `scripts/run_baselines.py`: TF-IDF, sentence embedding, POS, and classifier baselines.
 - `scripts/train_contrastive_encoder.py`: prompt-conditioned InfoNCE encoder.
 - `scripts/evaluate.py`: set-level attribution evaluation.
+## Contrastive Training And Ablations
+
+The contrastive encoder uses a high epoch ceiling with validation early stopping. In `configs/public_lineage_attribution.yaml`:
+
+```yaml
+num_epochs: 30
+early_stopping_metric: accuracy
+early_stopping_mode: max
+early_stopping_patience: 4
+early_stopping_min_delta: 0.002
+```
+
+This means training may run for up to 30 epochs, but it stops when validation accuracy has not improved by at least `0.002` for 4 consecutive epochs. The trainer saves:
+
+```text
+models/attribution_encoder/public_lineage_minilm_contrastive/best.pt
+models/attribution_encoder/public_lineage_minilm_contrastive/last.pt
+models/attribution_encoder/public_lineage_minilm_contrastive/training_metrics.json
+```
+
+Run the main contrastive training job:
+
+```bash
+sbatch jobs/05_train_public_lineage_contrastive.sbatch
+```
+
+A compact no-array ablation sweep is also available:
+
+```bash
+sbatch jobs/05_ablate_public_lineage_contrastive.sbatch
+```
+
+By default it runs a sequential compact sweep over temperature, classification-loss weight, learning rate, and one longer-context/projection setting. Results are written to:
+
+```text
+results/contrastive_ablation/ablation_summary.csv
+results/contrastive_ablation/ablation_summary.json
+models/attribution_encoder/public_lineage_ablations/
+```
+
+For a custom grid, override environment variables at submit time:
+
+```bash
+ABLATION_MODE=grid \
+TEMPERATURES="0.03,0.05,0.07,0.1" \
+CLASSIFICATION_WEIGHTS="0.1,0.2,0.5" \
+LEARNING_RATES="0.00002,0.00005" \
+MAX_LENGTHS="512,768" \
+PROJECTION_DIMS="128,256" \
+MAX_RUNS=12 \
+sbatch jobs/05_ablate_public_lineage_contrastive.sbatch
+```
+
+Keep `MAX_RUNS` modest on the student cluster because this job runs experiments sequentially inside one allocation.
