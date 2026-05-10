@@ -47,7 +47,11 @@ def main() -> None:
         gen_cfg.get("trust_remote_code", True),
     )
 
-    rows = []
+    if not args.resume:
+        write_jsonl(output_path, [])
+
+    written = 0
+    total = len(prompt_rows)
     for batch_rows in batch_iter(prompt_rows, gen_cfg.get("batch_size", 8)):
         rendered = [render_prompt(tokenizer, row["prompt"], prompt_format) for row in batch_rows]
         responses = generate_responses(
@@ -60,6 +64,7 @@ def main() -> None:
             top_p=gen_cfg["top_p"],
             max_input_tokens=gen_cfg.get("max_input_tokens"),
         )
+        rows = []
         for row, response in zip(batch_rows, responses, strict=True):
             rows.append(
                 {
@@ -78,12 +83,9 @@ def main() -> None:
                     "response": clean_generation(response),
                 }
             )
-
-    if args.resume and output_path.exists():
         append_jsonl(output_path, rows)
-    else:
-        write_jsonl(output_path, rows)
-    logging.info("Wrote %d rows to %s", len(rows), output_path)
+        written += len(rows)
+        logging.info("Wrote %d/%d rows to %s", written, total, output_path)
 
 
 if __name__ == "__main__":
