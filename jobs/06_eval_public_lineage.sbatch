@@ -11,7 +11,8 @@
 #SBATCH --time=04:00:00
 #SBATCH --output=logs/eval_public_attr_%j.out
 #SBATCH --error=logs/eval_public_attr_%j.err
-#SBATCH --mail-type=END,FAIL
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=luiz.lima@studbocconi.it
 
 set -euo pipefail
 
@@ -26,20 +27,27 @@ export HF_DATASETS_OFFLINE=1
 MODE="${1:-baselines}"
 MODELS_CONFIG="${MODELS_CONFIG:-configs/public_lineage_models.yaml}"
 ATTRIBUTION_CONFIG="${ATTRIBUTION_CONFIG:-configs/public_lineage_attribution.yaml}"
+TEACHER_LIST="${TEACHER_LIST:-}"
+TEACHER_ARGS=()
+if [[ -n "$TEACHER_LIST" ]]; then
+  TEACHER_ARGS=(--teacher_ids "$TEACHER_LIST")
+fi
 
 if [ "$MODE" = "baselines" ]; then
   python scripts/run_baselines.py \
     --models_config "$MODELS_CONFIG" \
     --train_pairs data/attribution/train_pairs.jsonl \
     --test_pairs data/attribution/test_pairs.jsonl \
-    --output results/baselines/public_lineage_test_metrics.json
+    --output results/baselines/public_lineage_test_metrics.json \
+    "${TEACHER_ARGS[@]}"
 elif [ "$MODE" = "encoder" ]; then
   python scripts/evaluate.py \
     --models_config "$MODELS_CONFIG" \
     --attribution_config "$ATTRIBUTION_CONFIG" \
     --pairs data/attribution/test_pairs.jsonl \
     --checkpoint models/attribution_encoder/public_lineage_minilm_contrastive/best.pt \
-    --output results/contrastive/public_lineage_set_level_metrics.json
+    --output results/contrastive/public_lineage_set_level_metrics.json \
+    "${TEACHER_ARGS[@]}"
 else
   echo "Unknown mode: $MODE" >&2
   exit 2

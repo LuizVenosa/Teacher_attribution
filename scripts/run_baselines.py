@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 import logging
-from typing import Callable
+from typing import Any, Callable
 
 import numpy as np
 
@@ -14,7 +14,12 @@ from teacher_attr.baselines import (
     tfidf_scores,
 )
 from teacher_attr.io import load_jsonl, load_yaml, save_json
-from teacher_attr.metrics import accuracy_by_task, classification_metrics
+from teacher_attr.metrics import (
+    accuracy_by_task,
+    accuracy_from_grouped,
+    classification_metrics,
+    grouped_classification_metrics,
+)
 from teacher_attr.utils import setup_logging, teacher_order_from_config
 
 
@@ -30,11 +35,81 @@ def parse_args() -> argparse.Namespace:
         help="SentenceTransformer model for embedding baseline.",
     )
     parser.add_argument("--skip_sentence", action="store_true")
+    parser.add_argument("--teacher_ids", default=None, help="Optional space/comma/colon-separated teacher IDs to evaluate.")
     return parser.parse_args()
+
+
+def parse_id_list(value: str | None) -> list[str] | None:
+    if not value:
+        return None
+    normalized = value.replace(",", " ").replace(":", " ")
+    return [item for item in normalized.split() if item]
+
+
+def select_teacher_ids(models_cfg: dict[str, Any], requested: str | None) -> list[str]:
+    all_teacher_ids = teacher_order_from_config(models_cfg)
+    requested_ids = parse_id_list(requested)
+    if requested_ids is None:
+        return all_teacher_ids
+    unknown = sorted(set(requested_ids) - set(all_teacher_ids))
+    if unknown:
+        raise ValueError(f"Unknown teacher IDs in --teacher_ids: {unknown}")
+    requested_set = set(requested_ids)
+    return [teacher_id for teacher_id in all_teacher_ids if teacher_id in requested_set]
 
 
 def labels_for(rows: list[dict], teacher_ids: list[str]) -> np.ndarray:
     return np.asarray([teacher_ids.index(row["true_teacher"]) for row in rows], dtype=np.int64)
+
+
+def group_value(row: dict[str, Any], key: str) -> str:
+    value = row.get(key)
+    return str(value) if value else "unknown"
+
+
+def student_teacher_pair(row: dict[str, Any]) -> str:
+    student_id = row.get("anchor_student_id") or row.get("student_id") or "unknown_student"
+    true_teacher = row.get("true_teacher") or "unknown_teacher"
+    return f"{student_id}->{true_teacher}"
+
+
+def add_breakdowns(
+    metrics: dict[str, Any],
+    scores: np.ndarray,
+    labels: np.ndarray,
+    rows: list[dict],
+    teacher_ids: list[str],
+) -> None:
+    metrics["accuracy_by_task"] = accuracy_by_task(
+        scores,
+        labels,
+        [row.get("task") for row in rows],
+    )
+
+    by_dataset = grouped_classification_metrics(
+        scores,
+        labels,
+        [group_value(row, "source_dataset") for row in rows],
+        teacher_ids,
+    )
+    by_pair = grouped_classification_metrics(
+        scores,
+        labels,
+        [student_teacher_pair(row) for row in rows],
+        teacher_ids,
+    )
+    by_task = grouped_classification_metrics(
+        scores,
+        labels,
+        [row.get("task") for row in rows],
+        teacher_ids,
+    )
+
+    metrics["accuracy_by_dataset"] = accuracy_from_grouped(by_dataset)
+    metrics["accuracy_by_student_teacher_pair"] = accuracy_from_grouped(by_pair)
+    metrics["breakdown_by_task"] = by_task
+    metrics["breakdown_by_dataset"] = by_dataset
+    metrics["breakdown_by_student_teacher_pair"] = by_pair
 
 
 def add_method(
@@ -48,11 +123,7 @@ def add_method(
     try:
         scores = score_fn()
         metrics = classification_metrics(scores, labels, teacher_ids)
-        metrics["accuracy_by_task"] = accuracy_by_task(
-            scores,
-            labels,
-            [row.get("task") for row in rows],
-        )
+        add_breakdowns(metrics, scores, labels, rows, teacher_ids)
         results[name] = metrics
         logging.info("%s accuracy: %.4f", name, metrics["accuracy"])
     except Exception as exc:
@@ -65,7 +136,7 @@ def main() -> None:
     args = parse_args()
 
     models_cfg = load_yaml(args.models_config)
-    teacher_ids = teacher_order_from_config(models_cfg)
+    teacher_ids = select_teacher_ids(models_cfg, args.teacher_ids)
     test_rows = load_jsonl(args.test_pairs)
     labels = labels_for(test_rows, teacher_ids)
     results: dict = {

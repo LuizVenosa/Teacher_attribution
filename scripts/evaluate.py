@@ -15,7 +15,12 @@ from teacher_attr.datasets import format_prompt_response
 from teacher_attr.encoders import AttributionEncoder
 from teacher_attr.generation import batch_iter
 from teacher_attr.io import load_jsonl, load_yaml, save_json
-from teacher_attr.metrics import accuracy_by_task, classification_metrics
+from teacher_attr.metrics import (
+    accuracy_by_task,
+    accuracy_from_grouped,
+    classification_metrics,
+    grouped_classification_metrics,
+)
 from teacher_attr.utils import get_device, seed_everything, setup_logging, teacher_order_from_config
 
 
@@ -26,7 +31,27 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--pairs", required=True)
     parser.add_argument("--checkpoint", required=True)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--teacher_ids", default=None, help="Optional space/comma/colon-separated teacher IDs to evaluate.")
     return parser.parse_args()
+
+
+def parse_id_list(value: str | None) -> list[str] | None:
+    if not value:
+        return None
+    normalized = value.replace(",", " ").replace(":", " ")
+    return [item for item in normalized.split() if item]
+
+
+def select_teacher_ids(models_cfg: dict[str, Any], requested: str | None) -> list[str]:
+    all_teacher_ids = teacher_order_from_config(models_cfg)
+    requested_ids = parse_id_list(requested)
+    if requested_ids is None:
+        return all_teacher_ids
+    unknown = sorted(set(requested_ids) - set(all_teacher_ids))
+    if unknown:
+        raise ValueError(f"Unknown teacher IDs in --teacher_ids: {unknown}")
+    requested_set = set(requested_ids)
+    return [teacher_id for teacher_id in all_teacher_ids if teacher_id in requested_set]
 
 
 def load_model(
@@ -86,6 +111,56 @@ def build_texts(rows: list[dict[str, Any]], teacher_ids: list[str]) -> tuple[lis
     return student_texts, teacher_texts
 
 
+def group_value(row: dict[str, Any], key: str) -> str:
+    value = row.get(key)
+    return str(value) if value else "unknown"
+
+
+def student_teacher_pair(row: dict[str, Any]) -> str:
+    student_id = row.get("anchor_student_id") or row.get("student_id") or "unknown_student"
+    true_teacher = row.get("true_teacher") or "unknown_teacher"
+    return f"{student_id}->{true_teacher}"
+
+
+def add_breakdowns(
+    metrics: dict[str, Any],
+    scores: np.ndarray,
+    labels: np.ndarray,
+    rows: list[dict[str, Any]],
+    teacher_ids: list[str],
+) -> None:
+    metrics["accuracy_by_task"] = accuracy_by_task(
+        scores,
+        labels,
+        [row.get("task") for row in rows],
+    )
+
+    by_dataset = grouped_classification_metrics(
+        scores,
+        labels,
+        [group_value(row, "source_dataset") for row in rows],
+        teacher_ids,
+    )
+    by_pair = grouped_classification_metrics(
+        scores,
+        labels,
+        [student_teacher_pair(row) for row in rows],
+        teacher_ids,
+    )
+    by_task = grouped_classification_metrics(
+        scores,
+        labels,
+        [row.get("task") for row in rows],
+        teacher_ids,
+    )
+
+    metrics["accuracy_by_dataset"] = accuracy_from_grouped(by_dataset)
+    metrics["accuracy_by_student_teacher_pair"] = accuracy_from_grouped(by_pair)
+    metrics["breakdown_by_task"] = by_task
+    metrics["breakdown_by_dataset"] = by_dataset
+    metrics["breakdown_by_student_teacher_pair"] = by_pair
+
+
 def set_level_metrics(
     rows: list[dict[str, Any]],
     student_emb: np.ndarray,
@@ -137,7 +212,7 @@ def main() -> None:
     attr_cfg = load_yaml(args.attribution_config)
     seed_everything(attr_cfg.get("seed", 13))
 
-    teacher_ids = teacher_order_from_config(models_cfg)
+    teacher_ids = select_teacher_ids(models_cfg, args.teacher_ids)
     model_name = models_cfg["attribution_encoder"]["hf_name"]
     device = get_device()
     tokenizer_path = Path(args.checkpoint).parent
@@ -183,11 +258,16 @@ def main() -> None:
         F.normalize(teacher_t, dim=-1),
     ).numpy()
 
+    single_prompt = classification_metrics(scores, labels, teacher_ids)
+    add_breakdowns(single_prompt, scores, labels, rows, teacher_ids)
+
     payload = {
         "num_rows": len(rows),
         "teacher_ids": teacher_ids,
-        "single_prompt": classification_metrics(scores, labels, teacher_ids),
-        "accuracy_by_task": accuracy_by_task(scores, labels, [row.get("task") for row in rows]),
+        "single_prompt": single_prompt,
+        "accuracy_by_task": single_prompt["accuracy_by_task"],
+        "accuracy_by_dataset": single_prompt["accuracy_by_dataset"],
+        "accuracy_by_student_teacher_pair": single_prompt["accuracy_by_student_teacher_pair"],
         "set_level": set_level_metrics(
             rows,
             student_emb,

@@ -87,6 +87,40 @@ def roc_auc_metrics(
     return out
 
 
+def grouped_classification_metrics(
+    scores: np.ndarray,
+    labels: np.ndarray,
+    groups: list[str | None],
+    teacher_ids: list[str],
+) -> dict[str, dict[str, Any]]:
+    grouped: dict[str, list[int]] = defaultdict(list)
+    for idx, group in enumerate(groups):
+        grouped[group or "unknown"].append(idx)
+
+    out: dict[str, dict[str, Any]] = {}
+    for group, indexes in sorted(grouped.items()):
+        idx = np.asarray(indexes, dtype=np.int64)
+        metrics = classification_metrics(scores[idx], labels[idx], teacher_ids)
+        metrics["num_rows"] = int(len(idx))
+        metrics["true_teacher_counts"] = _label_counts(labels[idx], teacher_ids)
+        metrics["predicted_teacher_counts"] = _label_counts(scores[idx].argmax(axis=1), teacher_ids)
+        out[group] = metrics
+    return out
+
+
+def accuracy_from_grouped(
+    grouped_metrics: dict[str, dict[str, Any]],
+) -> dict[str, float]:
+    return {group: float(metrics["accuracy"]) for group, metrics in grouped_metrics.items()}
+
+
+def _label_counts(values: np.ndarray, teacher_ids: list[str]) -> dict[str, int]:
+    counts = {teacher_id: 0 for teacher_id in teacher_ids}
+    for value in values:
+        counts[teacher_ids[int(value)]] += 1
+    return counts
+
+
 def accuracy_by_task(
     scores: np.ndarray,
     labels: np.ndarray,
