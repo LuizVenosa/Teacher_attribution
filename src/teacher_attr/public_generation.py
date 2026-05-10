@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any
 
@@ -69,6 +70,28 @@ def load_text_generation_model(model_name: str, dtype: str | None, trust_remote_
     return model, tokenizer, getattr(config, "is_encoder_decoder", False)
 
 
+
+def _usable_model_max_length(tokenizer: Any, model: Any) -> int:
+    candidates = []
+    tokenizer_limit = getattr(tokenizer, "model_max_length", None)
+    if isinstance(tokenizer_limit, int) and tokenizer_limit < 100_000:
+        candidates.append(tokenizer_limit)
+
+    config = getattr(model, "config", None)
+    for attr in (
+        "max_position_embeddings",
+        "n_positions",
+        "max_sequence_length",
+        "seq_length",
+        "max_encoder_position_embeddings",
+    ):
+        value = getattr(config, attr, None)
+        if isinstance(value, int) and value > 0:
+            candidates.append(value)
+
+    return min(candidates) if candidates else 2048
+
+
 @torch.no_grad()
 def generate_responses(
     model: Any,
@@ -79,10 +102,30 @@ def generate_responses(
     max_new_tokens: int,
     temperature: float,
     top_p: float,
+    max_input_tokens: int | None = None,
 ) -> list[str]:
     device = next(model.parameters()).device
-    inputs = tokenizer(prompts, return_tensors="pt", padding=True, truncation=True)
+    context_window = _usable_model_max_length(tokenizer, model)
+    if max_input_tokens is None:
+        reserved_tokens = 0 if is_encoder_decoder else max_new_tokens
+        max_input_tokens = max(8, context_window - reserved_tokens)
+    else:
+        max_input_tokens = min(max_input_tokens, context_window)
+
+    inputs = tokenizer(
+        prompts,
+        return_tensors="pt",
+        padding=True,
+        truncation=True,
+        max_length=max_input_tokens,
+    )
     input_len = inputs["input_ids"].shape[1]
+    if input_len >= context_window and not is_encoder_decoder:
+        logging.warning(
+            "Decoder-only input length %d is at/above context window %d; reduce max_input_tokens.",
+            input_len,
+            context_window,
+        )
     inputs = {key: value.to(device) for key, value in inputs.items()}
 
     generated = model.generate(

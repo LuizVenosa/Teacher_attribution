@@ -23,6 +23,11 @@ Then it trains and evaluates a contrastive prompt-response encoder that pulls ea
 
 The model list lives in `configs/public_lineage_models.yaml`.
 
+An expanded candidate pool lives in `configs/public_lineage_models_extended.yaml`.
+It includes the default four pairs plus documented SmolLM2, Llama, and Qwen3
+distillation candidates. See `docs/public_lineage_candidate_pairs.md` for the
+evidence notes and recommended subset order before running the heavier models.
+
 ## Pipeline
 
 ```text
@@ -94,6 +99,31 @@ sbatch jobs/05_train_public_lineage_contrastive.sbatch
 # 5. Evaluate set-level attribution.
 sbatch jobs/06_eval_public_lineage.sbatch encoder
 ```
+
+To run the expanded candidate pool instead of the default four-pair setup:
+
+```bash
+MODELS_CONFIG=configs/public_lineage_models_extended.yaml \
+sbatch jobs/01_generate_public_lineage_outputs.sbatch
+
+MODELS_CONFIG=configs/public_lineage_models_extended.yaml \
+sbatch jobs/04_build_public_lineage_attribution.sbatch
+```
+
+For the first expanded run, prefer a medium-size subset before adding the heavy
+Qwen3 MoE teacher:
+
+```bash
+MODELS_CONFIG=configs/public_lineage_models_extended.yaml \
+TEACHER_LIST="gpt2 qwen15_18b flan_t5_base flan_t5_small llama32_3b_instruct smollm2_17b_instruct" \
+STUDENT_LIST="distilgpt2:miniplm_qwen_200m:lamini_flan_t5_248m:lamini_flan_t5_77m:lrc_15b_sft:d_smollm2_360m" \
+sbatch jobs/01_generate_public_lineage_outputs.sbatch
+```
+
+If you previously generated public-lineage outputs, move or delete the old
+`data/public_lineage` directory before switching configs so old student JSONL
+files do not get mixed into the new attribution build.
+
 
 ## Who Taught You That Comparability
 

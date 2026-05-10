@@ -26,22 +26,19 @@ export HF_DATASETS_OFFLINE=1
 MODELS_CONFIG="${MODELS_CONFIG:-configs/public_lineage_models.yaml}"
 GENERATION_CONFIG="${GENERATION_CONFIG:-configs/public_lineage_generation.yaml}"
 SPLIT_LIST="${SPLIT_LIST:-train val test}"
-TEACHER_LIST="${TEACHER_LIST:-gpt2 qwen15_18b flan_t5_base flan_t5_small}"
-STUDENT_LIST="${STUDENT_LIST:-distilgpt2:miniplm_qwen_200m:lamini_flan_t5_248m:lamini_flan_t5_77m}"
+TEACHER_LIST="${TEACHER_LIST:-}"
+STUDENT_LIST="${STUDENT_LIST:-}"
+
+if [[ -z "$TEACHER_LIST" ]]; then
+  TEACHER_LIST="$(python scripts/public_lineage_config.py --models_config "$MODELS_CONFIG" --list teachers --separator " ")"
+fi
+if [[ -z "$STUDENT_LIST" ]]; then
+  STUDENT_LIST="$(python scripts/public_lineage_config.py --models_config "$MODELS_CONFIG" --list students --separator ":")"
+fi
 
 read -r -a SPLITS <<< "$SPLIT_LIST"
 read -r -a TEACHERS <<< "$TEACHER_LIST"
 IFS=":" read -r -a STUDENTS <<< "$STUDENT_LIST"
-
-teacher_for_student() {
-  case "$1" in
-    distilgpt2) echo "gpt2" ;;
-    miniplm_qwen_200m) echo "qwen15_18b" ;;
-    lamini_flan_t5_248m) echo "flan_t5_base" ;;
-    lamini_flan_t5_77m) echo "flan_t5_small" ;;
-    *) echo "Unknown student id: $1" >&2; return 2 ;;
-  esac
-}
 
 for SPLIT in "${SPLITS[@]}"; do
   for TEACHER_ID in "${TEACHERS[@]}"; do
@@ -56,14 +53,14 @@ for SPLIT in "${SPLITS[@]}"; do
   done
 
   for STUDENT_ID in "${STUDENTS[@]}"; do
-    TRUE_TEACHER="$(teacher_for_student "$STUDENT_ID")"
+    TRUE_TEACHER="$(python scripts/public_lineage_config.py --models_config "$MODELS_CONFIG" --student_teacher "$STUDENT_ID")"
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] student=$STUDENT_ID true_teacher=$TRUE_TEACHER split=$SPLIT"
     python scripts/generate_public_students.py \
       --student_id "$STUDENT_ID" \
       --models_config "$MODELS_CONFIG" \
       --generation_config "$GENERATION_CONFIG" \
       --prompts "data/prompts/prompts_${SPLIT}.jsonl" \
-      --output "data/public_lineage/student_outputs/student_from_${TRUE_TEACHER}_${SPLIT}.jsonl" \
+      --output "data/public_lineage/student_outputs/student_from_${STUDENT_ID}_${SPLIT}.jsonl" \
       --resume
   done
 done

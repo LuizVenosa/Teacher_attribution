@@ -1,0 +1,108 @@
+teachers:
+  gpt2:
+    hf_name: gpt2
+    prompt_format: completion
+    evidence_level: high
+    notes: "Original DistilGPT2 teacher."
+  qwen15_18b:
+    hf_name: Qwen/Qwen1.5-1.8B
+    prompt_format: completion
+    evidence_level: high
+    notes: "Teacher named by MiniPLM-Qwen-200M documentation."
+  flan_t5_base:
+    hf_name: google/flan-t5-base
+    prompt_format: text2text
+    evidence_level: medium
+    notes: "Flan-T5-family instruction distillation lineage."
+  flan_t5_small:
+    hf_name: google/flan-t5-small
+    prompt_format: text2text
+    evidence_level: medium
+    notes: "Flan-T5-family instruction distillation lineage."
+  smollm2_17b_instruct:
+    hf_name: HuggingFaceTB/SmolLM2-1.7B-Instruct
+    prompt_format: chat
+    evidence_level: medium_high
+    notes: "Teacher named by d-SmolLM2-360M model card."
+  llama32_3b_instruct:
+    hf_name: meta-llama/Llama-3.2-3B-Instruct
+    prompt_format: chat
+    evidence_level: high
+    gated: true
+    notes: "Teacher named by LRC-1.5B model cards. Requires accepted Llama license and HF token."
+  llama31_8b_instruct:
+    hf_name: meta-llama/Llama-3.1-8B-Instruct
+    prompt_format: chat
+    evidence_level: medium_high
+    gated: true
+    notes: "Teacher named by third-party Llama-3.2-3B distillation model card. Requires accepted Llama license and HF token."
+  qwen3_30b_a3b_thinking:
+    hf_name: Qwen/Qwen3-30B-A3B-Thinking-2507
+    prompt_format: chat
+    evidence_level: medium
+    heavy: true
+    notes: "Teacher for third-party Qwen3 0.6B distilled checkpoint; heavy MoE, use only after resource check."
+
+public_students:
+  distilgpt2:
+    hf_name: distilbert/distilgpt2
+    true_teacher: gpt2
+    prompt_format: completion
+    evidence_level: high
+    evidence: "DistilGPT2 model card says it was supervised by GPT-2 124M."
+  miniplm_qwen_200m:
+    hf_name: MiniLLM/MiniPLM-Qwen-200M
+    true_teacher: qwen15_18b
+    prompt_format: completion
+    evidence_level: high
+    evidence: "MiniPLM-Qwen-200M model card/dataset metadata names Qwen1.5-1.8B as teacher."
+  lamini_flan_t5_248m:
+    hf_name: MBZUAI/LaMini-Flan-T5-248M
+    true_teacher: flan_t5_base
+    prompt_format: text2text
+    evidence_level: medium
+    evidence: "LaMini-Flan-T5-248M is a Flan-T5-base-family instruction-distilled checkpoint."
+  lamini_flan_t5_77m:
+    hf_name: MBZUAI/LaMini-Flan-T5-77M
+    true_teacher: flan_t5_small
+    prompt_format: text2text
+    evidence_level: medium
+    evidence: "LaMini-Flan-T5-77M is a Flan-T5-small-family instruction-distilled checkpoint."
+  d_smollm2_360m:
+    hf_name: aloobun/d-SmolLM2-360M
+    true_teacher: smollm2_17b_instruct
+    prompt_format: chat
+    evidence_level: medium_high
+    evidence: "Model card describes a distillation experiment with SmolLM2-1.7B as teacher and SmolLM2-360M as student."
+  lrc_15b_sft:
+    hf_name: JitaiHao/LRC-1.5B-SFT
+    true_teacher: llama32_3b_instruct
+    prompt_format: chat
+    evidence_level: high
+    evidence: "LRC-1.5B cards say the base model was distilled from Llama-3.2-3B-Instruct; SFT version is further UltraChat-tuned."
+  llama32_3b_distill_glore:
+    hf_name: SwashBuckler001/Llama-3.2-3B-distill-GLoRE
+    true_teacher: llama31_8b_instruct
+    prompt_format: chat
+    evidence_level: medium_high
+    evidence: "Model card says Llama-3.2-3B was distilled from Llama-3.1-8B-Instruct."
+  qwen3_06b_distilled_30b_a3b:
+    hf_name: reaperdoesntknow/Qwen3-0.6B-Distilled-30B-A3B
+    true_teacher: qwen3_30b_a3b_thinking
+    prompt_format: chat
+    evidence_level: medium
+    heavy_teacher: true
+    evidence: "Model card says Qwen3-0.6B was distilled from Qwen3-30B-A3B-Thinking. Teacher generation is heavy."
+
+attribution_encoder:
+  hf_name: sentence-transformers/all-MiniLM-L6-v2
+
+teacher_labels:
+  gpt2: 0
+  qwen15_18b: 1
+  flan_t5_base: 2
+  flan_t5_small: 3
+  smollm2_17b_instruct: 4
+  llama32_3b_instruct: 5
+  llama31_8b_instruct: 6
+  qwen3_30b_a3b_thinking: 7

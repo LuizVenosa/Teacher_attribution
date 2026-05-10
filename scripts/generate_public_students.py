@@ -58,6 +58,7 @@ def main() -> None:
             max_new_tokens=gen_cfg["max_new_tokens"],
             temperature=gen_cfg["temperature"],
             top_p=gen_cfg["top_p"],
+            max_input_tokens=gen_cfg.get("max_input_tokens"),
         )
         for row, response in zip(batch_rows, responses, strict=True):
             rows.append(
