@@ -27,7 +27,24 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--split", required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("--allow_missing", action="store_true")
+    parser.add_argument(
+        "--teacher_ids",
+        default=None,
+        help="Optional space/comma/colon-separated teacher IDs to include.",
+    )
+    parser.add_argument(
+        "--student_ids",
+        default=None,
+        help="Optional space/comma/colon-separated student IDs to include.",
+    )
     return parser.parse_args()
+
+
+def parse_id_list(value: str | None) -> list[str] | None:
+    if not value:
+        return None
+    normalized = value.replace(",", " ").replace(":", " ")
+    return [item for item in normalized.split() if item]
 
 
 def load_teacher_outputs(
@@ -56,8 +73,17 @@ def main() -> None:
     args = parse_args()
 
     models_cfg = load_yaml(args.models_config)
-    teacher_ids = teacher_order_from_config(models_cfg)
-    label_lookup = models_cfg["teacher_labels"]
+    all_teacher_ids = teacher_order_from_config(models_cfg)
+    requested_teacher_ids = parse_id_list(args.teacher_ids)
+    if requested_teacher_ids is None:
+        teacher_ids = all_teacher_ids
+    else:
+        unknown = sorted(set(requested_teacher_ids) - set(all_teacher_ids))
+        if unknown:
+            raise ValueError(f"Unknown teacher IDs in --teacher_ids: {unknown}")
+        requested_set = set(requested_teacher_ids)
+        teacher_ids = [teacher_id for teacher_id in all_teacher_ids if teacher_id in requested_set]
+    label_lookup = {teacher_id: idx for idx, teacher_id in enumerate(teacher_ids)}
 
     teacher_outputs = load_teacher_outputs(
         Path(args.teacher_outputs_dir),
@@ -65,7 +91,18 @@ def main() -> None:
         teacher_ids,
     )
 
-    student_paths = sorted(Path(args.student_outputs_dir).glob(f"student_from_*_{args.split}.jsonl"))
+    requested_student_ids = parse_id_list(args.student_ids)
+    student_outputs_dir = Path(args.student_outputs_dir)
+    if requested_student_ids is None:
+        student_paths = sorted(student_outputs_dir.glob(f"student_from_*_{args.split}.jsonl"))
+    else:
+        student_paths = [
+            student_outputs_dir / f"student_from_{student_id}_{args.split}.jsonl"
+            for student_id in requested_student_ids
+        ]
+    missing_student_paths = [str(path) for path in student_paths if not path.exists()]
+    if missing_student_paths:
+        raise FileNotFoundError(f"Missing student output files: {missing_student_paths}")
     if not student_paths:
         raise FileNotFoundError(f"No student outputs found for split={args.split}")
 
@@ -83,6 +120,11 @@ def main() -> None:
                 teacher_responses[teacher_id] = teacher_row["response"]
             else:
                 true_teacher = row["true_teacher"]
+                if true_teacher not in label_lookup:
+                    raise ValueError(
+                        f"Student {row.get('student_id')} has true_teacher={true_teacher}, "
+                        f"which is not in the selected teachers: {teacher_ids}"
+                    )
                 pairs.append(
                     {
                         "prompt_id": prompt_id,
