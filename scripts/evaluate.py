@@ -262,6 +262,13 @@ def main() -> None:
     add_breakdowns(single_prompt, scores, labels, rows, teacher_ids)
 
     payload = {
+        "run_type": "contrastive_encoder_eval",
+        "encoder_model": model_name,
+        "models_config_path": args.models_config,
+        "attribution_config_path": args.attribution_config,
+        "checkpoint": args.checkpoint,
+        "pairs": args.pairs,
+        "output": args.output,
         "num_rows": len(rows),
         "teacher_ids": teacher_ids,
         "single_prompt": single_prompt,

@@ -45,8 +45,8 @@ elif [ "$MODE" = "encoder" ]; then
     --models_config "$MODELS_CONFIG" \
     --attribution_config "$ATTRIBUTION_CONFIG" \
     --pairs data/attribution/test_pairs.jsonl \
-    --checkpoint models/attribution_encoder/public_lineage_minilm_contrastive/best.pt \
-    --output results/contrastive/public_lineage_set_level_metrics.json \
+    --checkpoint "${ENCODER_CHECKPOINT:-models/attribution_encoder/public_lineage_e5_large_v2_contrastive/best.pt}" \
+    --output "${ENCODER_OUTPUT:-results/contrastive/public_lineage_e5_large_v2_metrics.json}" \
     "${TEACHER_ARGS[@]}"
 else
   echo "Unknown mode: $MODE" >&2

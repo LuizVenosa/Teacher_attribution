@@ -182,6 +182,9 @@ def main() -> None:
         local_files_only=_offline_mode(),
     ).to(device)
     model.enable_gradient_checkpointing()
+    logging.info("Encoder backbone: %s", model_name)
+    logging.info("Output directory: %s", output_dir)
+    logging.info("Attribution config: %s", args.attribution_config)
     logging.info("Model parameters: %s", count_parameters(model))
 
     optimizer = AdamW(
@@ -299,6 +302,14 @@ def main() -> None:
             epochs_without_improvement += 1
 
         summary = {
+            "run_type": "contrastive_encoder_train",
+            "encoder_model": model_name,
+            "models_config_path": args.models_config,
+            "attribution_config_path": args.attribution_config,
+            "output_dir": str(output_dir),
+            "train_file": attr_cfg["train_file"],
+            "val_file": attr_cfg["val_file"],
+            "teacher_ids": teacher_ids,
             "history": history,
             "best_accuracy": best_acc,
             "best_epoch": best_epoch,
