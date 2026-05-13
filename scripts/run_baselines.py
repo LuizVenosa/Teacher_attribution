@@ -7,11 +7,10 @@ from typing import Any, Callable
 import numpy as np
 
 from teacher_attr.baselines import (
-    load_spacy_model,
-    pos_template_scores,
-    sentence_embedding_scores,
-    student_only_classifier_scores,
-    tfidf_scores,
+    bertscore_scores,
+    bow_classifier_scores,
+    bow_similarity_scores,
+    ngram_classifier_scores,
 )
 from teacher_attr.io import load_jsonl, load_yaml, save_json
 from teacher_attr.metrics import (
@@ -30,11 +29,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--test_pairs", required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument(
-        "--sentence_model",
-        default="sentence-transformers/all-MiniLM-L6-v2",
-        help="SentenceTransformer model for embedding baseline.",
+        "--bertscore_model",
+        default="roberta-large",
+        help="Model used by the WTYT BERTScore similarity baseline.",
     )
-    parser.add_argument("--skip_sentence", action="store_true")
+    parser.add_argument("--skip_bertscore", action="store_true")
     parser.add_argument("--teacher_ids", default=None, help="Optional space/comma/colon-separated teacher IDs to evaluate.")
     return parser.parse_args()
 
@@ -147,32 +146,21 @@ def main() -> None:
 
     add_method(
         results["methods"],
-        "tfidf_same_prompt",
-        lambda: tfidf_scores(test_rows, teacher_ids),
+        "bow_same_prompt",
+        lambda: bow_similarity_scores(test_rows, teacher_ids),
         test_rows,
         labels,
         teacher_ids,
     )
 
-    nlp = load_spacy_model()
-    add_method(
-        results["methods"],
-        "pos_template",
-        lambda: pos_template_scores(test_rows, teacher_ids, nlp=nlp),
-        test_rows,
-        labels,
-        teacher_ids,
-    )
-    results["methods"]["pos_template"]["backend"] = "spacy" if nlp is not None else "shape_fallback"
-
-    if not args.skip_sentence:
+    if not args.skip_bertscore:
         add_method(
             results["methods"],
-            "sentence_embedding_same_prompt",
-            lambda: sentence_embedding_scores(
+            "bertscore_same_prompt",
+            lambda: bertscore_scores(
                 test_rows,
                 teacher_ids,
-                model_name=args.sentence_model,
+                model_type=args.bertscore_model,
             ),
             test_rows,
             labels,
@@ -183,8 +171,16 @@ def main() -> None:
         train_rows = load_jsonl(args.train_pairs)
         add_method(
             results["methods"],
-            "student_only_tfidf_classifier",
-            lambda: student_only_classifier_scores(train_rows, test_rows, teacher_ids),
+            "bow_classifier",
+            lambda: bow_classifier_scores(train_rows, test_rows, teacher_ids),
+            test_rows,
+            labels,
+            teacher_ids,
+        )
+        add_method(
+            results["methods"],
+            "ngram_1_4_classifier",
+            lambda: ngram_classifier_scores(train_rows, test_rows, teacher_ids),
             test_rows,
             labels,
             teacher_ids,
