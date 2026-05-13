@@ -8,10 +8,11 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
-#SBATCH --time=08:00:00
+#SBATCH --time=24:00:00
 #SBATCH --output=logs/ablate_public_attr_%j.out
 #SBATCH --error=logs/ablate_public_attr_%j.err
-#SBATCH --mail-type=END,FAIL
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=luiz.lima@studbocconi.it
 
 set -euo pipefail
 
@@ -33,4 +34,6 @@ python scripts/run_contrastive_ablation.py \
   --max_lengths "${MAX_LENGTHS:-512}" \
   --projection_dims "${PROJECTION_DIMS:-128}" \
   --max_runs "${MAX_RUNS:-7}" \
+  --fixed_epochs "${FIXED_EPOCHS:-5}" \
+  --disable_early_stopping \
   --skip_existing

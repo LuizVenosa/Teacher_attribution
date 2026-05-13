@@ -20,11 +20,11 @@ COMPACT_EXPERIMENTS: list[dict[str, Any]] = [
     {"name": "cls050", "temperature": 0.05, "classification_weight": 0.5, "learning_rate": 2e-5},
     {"name": "lr5e5", "temperature": 0.05, "classification_weight": 0.2, "learning_rate": 5e-5},
     {
-        "name": "longer_context_proj256",
+        "name": "proj256",
         "temperature": 0.05,
         "classification_weight": 0.2,
         "learning_rate": 2e-5,
-        "max_length": 768,
+        "max_length": 512,
         "projection_dim": 256,
     },
 ]
@@ -44,6 +44,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--projection_dims", default="128")
     parser.add_argument("--max_runs", type=int, default=None)
     parser.add_argument("--skip_existing", action="store_true")
+    parser.add_argument("--fixed_epochs", type=int, default=None)
+    parser.add_argument("--disable_early_stopping", action="store_true")
     parser.add_argument("--dry_run", action="store_true")
     return parser.parse_args()
 
@@ -131,6 +133,11 @@ def main() -> None:
         cfg = dict(base_cfg)
         cfg.update({key: value for key, value in exp.items() if key != "name"})
         cfg["output_dir"] = str(output_dir)
+        if args.fixed_epochs is not None:
+            cfg["num_epochs"] = args.fixed_epochs
+            cfg["max_epochs"] = args.fixed_epochs
+        if args.disable_early_stopping:
+            cfg["early_stopping_patience"] = None
         cfg_path = config_dir / f"{idx:02d}_{name}.yaml"
         write_yaml(cfg_path, cfg)
 

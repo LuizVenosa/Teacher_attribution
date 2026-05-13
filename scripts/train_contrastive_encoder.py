@@ -64,21 +64,34 @@ def evaluate(
     device: torch.device,
     teacher_ids: list[str],
     temperature: float,
+    classification_weight: float,
     mixed_precision: str | None,
 ) -> dict[str, Any]:
     model.eval()
     score_chunks = []
     label_chunks = []
     tasks: list[str | None] = []
+    total_loss = 0.0
+    total_contrastive_loss = 0.0
+    total_classification_loss = 0.0
+    total_examples = 0
 
     for batch in loader:
         labels = batch["labels"].to(device)
+        batch_size = int(batch["batch_size"])
         with autocast_context(device, mixed_precision):
-            student_emb, _ = model(**move_tokens(batch["student"], device))
+            student_emb, student_logits = model(**move_tokens(batch["student"], device))
             teacher_emb, _ = model(**move_tokens(batch["teachers"], device))
-            teacher_emb = teacher_emb.view(batch["batch_size"], batch["num_teachers"], -1)
+            teacher_emb = teacher_emb.view(batch_size, batch["num_teachers"], -1)
             scores = same_prompt_scores(student_emb, teacher_emb, temperature=temperature)
+            contrastive_loss = F.cross_entropy(scores, labels)
+            classification_loss = F.cross_entropy(student_logits, labels)
+            loss = contrastive_loss + classification_weight * classification_loss
 
+        total_loss += float(loss.detach().cpu()) * batch_size
+        total_contrastive_loss += float(contrastive_loss.detach().cpu()) * batch_size
+        total_classification_loss += float(classification_loss.detach().cpu()) * batch_size
+        total_examples += batch_size
         score_chunks.append(scores.float().cpu().numpy())
         label_chunks.append(labels.cpu().numpy())
         tasks.extend(meta.get("task") for meta in batch["metadata"])
@@ -88,6 +101,9 @@ def evaluate(
 
     metrics = classification_metrics(scores_np, labels_np, teacher_ids)
     metrics["accuracy_by_task"] = accuracy_by_task(scores_np, labels_np, tasks)
+    metrics["loss"] = total_loss / max(total_examples, 1)
+    metrics["contrastive_loss"] = total_contrastive_loss / max(total_examples, 1)
+    metrics["classification_loss"] = total_classification_loss / max(total_examples, 1)
     return metrics
 
 
@@ -235,14 +251,16 @@ def main() -> None:
             device=device,
             teacher_ids=teacher_ids,
             temperature=attr_cfg["temperature"],
+            classification_weight=attr_cfg["classification_weight"],
             mixed_precision=attr_cfg.get("mixed_precision"),
         )
         history.append({"epoch": epoch, "train_loss": running_loss / len(train_loader), **val_metrics})
         current_score = float(val_metrics[monitor_metric])
         logging.info(
-            "epoch=%d val_accuracy=%.4f %s=%.4f",
+            "epoch=%d val_accuracy=%.4f val_loss=%.4f %s=%.4f",
             epoch,
             val_metrics["accuracy"],
+            val_metrics["loss"],
             monitor_metric,
             current_score,
         )
