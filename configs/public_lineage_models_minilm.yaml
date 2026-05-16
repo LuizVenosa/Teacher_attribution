@@ -1,0 +1,44 @@
+teachers:
+  gpt2:
+    hf_name: gpt2
+    prompt_format: completion
+  qwen15_18b:
+    hf_name: Qwen/Qwen1.5-1.8B
+    prompt_format: completion
+  flan_t5_base:
+    hf_name: google/flan-t5-base
+    prompt_format: text2text
+  flan_t5_small:
+    hf_name: google/flan-t5-small
+    prompt_format: text2text
+
+public_students:
+  distilgpt2:
+    hf_name: distilbert/distilgpt2
+    true_teacher: gpt2
+    prompt_format: completion
+    evidence: "DistilGPT2 model card: distilled with supervision from GPT-2 124M."
+  miniplm_qwen_200m:
+    hf_name: MiniLLM/MiniPLM-Qwen-200M
+    true_teacher: qwen15_18b
+    prompt_format: completion
+    evidence: "MiniPLM-Qwen-200M model card: trained using MiniPLM with official Qwen1.5-1.8B as teacher."
+  lamini_flan_t5_248m:
+    hf_name: MBZUAI/LaMini-Flan-T5-248M
+    true_teacher: flan_t5_base
+    prompt_format: text2text
+    evidence: "LaMini-Flan-T5-248M is based on / instruction-distilled from Flan-T5-base style training."
+  lamini_flan_t5_77m:
+    hf_name: MBZUAI/LaMini-Flan-T5-77M
+    true_teacher: flan_t5_small
+    prompt_format: text2text
+    evidence: "LaMini-Flan-T5-77M is the 77M Flan-T5-family instruction-distilled checkpoint."
+
+attribution_encoder:
+  hf_name: sentence-transformers/all-MiniLM-L6-v2
+
+teacher_labels:
+  gpt2: 0
+  qwen15_18b: 1
+  flan_t5_base: 2
+  flan_t5_small: 3

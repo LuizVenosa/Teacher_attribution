@@ -8,10 +8,11 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:1
 #SBATCH --mem=80G
-#SBATCH --time=08:00:00
+#SBATCH --time=24:00:00
 #SBATCH --output=logs/gen_public_lineage_%j.out
 #SBATCH --error=logs/gen_public_lineage_%j.err
-#SBATCH --mail-type=END,FAIL
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=luiz.lima@studbocconi.it
 
 set -euo pipefail
 
