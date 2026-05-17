@@ -1,5 +1,5 @@
 \documentclass[11pt]{article}
-\usepackage[review]{acl}
+\usepackage{acl}
 \usepackage{times}
 \usepackage{latexsym}
 \usepackage[T1]{fontenc}
@@ -155,30 +155,16 @@ Summarization may compress outputs into more similar forms, making lineage harde
 
 \subsection{Set-Level Attribution}
 
-Teacher attribution becomes much easier when multiple prompts are aggregated (Table~\ref{tab:setlevel}).
+Teacher attribution becomes much easier when multiple prompts are aggregated, as shown in the set-level plot below.
 With two prompts, accuracy rises to 73.75\%; with four prompts, to 90.0\%; and with eight prompts, to 97.5\%.
 At 16 or more prompts, the sampled set-level evaluation reaches 100\%.
 This is the clearest evidence for the project hypothesis: a single response can be noisy, but a student model exhibits a more stable teacher fingerprint across prompts.
 
-\begin{table}[t]
+\begin{center}
 \centering
-\small
-\begin{tabular}{rccc}
-\toprule
-Prompts & Acc. & Top-2 & AUC \\
-\midrule
-1 & 62.50 & 80.00 & 64.54 \\
-2 & 73.75 & 92.50 & 83.67 \\
-4 & 90.00 & 98.75 & 90.60 \\
-8 & 97.50 & 100.00 & 96.15 \\
-16 & 100.00 & 100.00 & 97.52 \\
-32 & 100.00 & 100.00 & 99.33 \\
-64 & 100.00 & 100.00 & 99.81 \\
-\bottomrule
-\end{tabular}
-\caption{Set-level attribution improves as more prompts are aggregated. Results are sampled over prompt sets.}
-\label{tab:setlevel}
-\end{table}
+\includegraphics[width=\columnwidth]{figures/11_single_vs_set_level_comparison.png}
+{\small \textbf{Figure 1:} Single-prompt versus set-level evaluation. Aggregating multiple prompts sharply improves teacher attribution accuracy and AUC.}
+\end{center}
 
 \subsection{Ablations and Larger Encoders}
 
@@ -186,6 +172,13 @@ I ran seven fixed five-epoch MiniLM ablations over temperature, classification w
 The best ablation by test accuracy was a higher learning rate run (\texttt{lr5e5}) at 60.08\%, but it did not beat the full early-stopped MiniLM model.
 The best validation ablation used a larger projection dimension, but reached only 59.68\% on test.
 Overall, the ablations indicate that performance is not mainly limited by these shallow hyperparameters.
+The training curve below also shows why I selected the early-stopped checkpoint: loss continues to fall, but validation accuracy flattens around 60--61\%, suggesting increasing specialization without clear attribution gains.
+
+\begin{center}
+\centering
+\includegraphics[width=\columnwidth]{figures/01_training_loss_accuracy.png}
+{\small \textbf{Figure 2:} Training loss decreases steadily while validation accuracy plateaus, motivating early stopping rather than longer training.}
+\end{center}
 
 I also explored larger encoders.
 E5-large improved for three epochs but collapsed to chance accuracy at epoch 4, suggesting unstable full fine-tuning.
