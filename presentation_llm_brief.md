@@ -1,6 +1,6 @@
 # PowerPoint Generation Brief: Teacher Attribution Project
 
-Use this markdown as the source brief for building a polished academic PowerPoint presentation. The presentation should explain the research idea, motivation, method, experiment design, pipeline, and expected results clearly to a machine learning / NLP audience.
+Use this markdown as the source brief for building a polished academic PowerPoint presentation. The presentation should explain the research idea, motivation, method, experiment design, pipeline, and current results clearly to a machine learning / NLP audience.
 
 ## Presentation Goal
 
@@ -92,10 +92,13 @@ The experiment uses a shared prompt bank inspired by the task mix from *Who Taug
 
 Prompt sources include a mix of:
 
+- CNN/DailyMail
+- SumpubMed
 - CommonsenseQA
 - OpenBookQA
+- QuaRel
+- Rotten Tomatoes
 - Alpaca-style instruction prompts
-- Rotten Tomatoes sentiment/review prompts
 
 All candidate teachers and all public students answer the same prompts.
 
@@ -208,21 +211,21 @@ This produces a behavioral fingerprint over multiple prompts.
 
 ## Baselines
 
-The project evaluates against several baselines:
+The project evaluates against WTYT-style baselines that are reproducible in the current environment:
 
-1. **TF-IDF same-prompt similarity**
-   - Compare student response to each teacher response lexically.
+1. **BoW same-prompt similarity**
+   - Compare the student response against same-prompt teacher responses with lexical features.
 
-2. **Sentence embedding similarity**
-   - Use a generic sentence-transformer embedding without contrastive fine-tuning.
+2. **BERTScore same-prompt similarity**
+   - Compare student and teacher responses with contextual token-level similarity.
 
-3. **POS-template similarity**
-   - Compare syntactic patterns rather than raw wording.
+3. **BoW classifier**
+   - Train a supervised text classifier from student responses to teacher labels.
 
-4. **Student-only classifier**
-   - Predict teacher from the student response alone.
+4. **1-4 gram classifier**
+   - Train a supervised n-gram classifier from student responses to teacher labels.
 
-The contrastive method should outperform baselines if it learns teacher-specific fingerprints rather than surface similarity alone.
+The POS-template baseline from the paper is not used in the main comparison because it was not reliably replicated in the current environment.
 
 ## Evaluation Metrics
 
@@ -230,8 +233,11 @@ Report:
 
 - top-1 accuracy
 - top-2 accuracy
+- ROC-AUC
 - confusion matrix
 - accuracy by task type
+- accuracy by dataset
+- accuracy by student-teacher pair
 - accuracy as a function of number of prompts aggregated
 
 The most important figure is:
@@ -248,6 +254,39 @@ Expected trend:
 16 prompts -> strong signal
 32+ prompts -> more stable teacher fingerprint
 ```
+
+## Current Results
+
+Completed main result:
+
+| Model | Setting | Accuracy | Top-2 accuracy | Macro ROC-AUC |
+|---|---|---:|---:|---:|
+| MiniLM contrastive encoder | Validation best checkpoint | 0.6055 | 0.8307 | 0.6822 |
+| MiniLM contrastive encoder | Test, single prompt | 0.6044 | 0.8284 | 0.6814 |
+| MiniLM contrastive encoder | Test, set size 4 | 0.9000 | 0.9875 | 0.9060 |
+| MiniLM contrastive encoder | Test, set size 8 | 0.9750 | 1.0000 | 0.9615 |
+| MiniLM contrastive encoder | Test, set size 16+ | 1.0000 | 1.0000 | 0.9752+ |
+
+Single-prompt MiniLM test accuracy by task:
+
+| Task | Accuracy |
+|---|---:|
+| QA | 0.8418 |
+| Instruction following | 0.6090 |
+| Summarization | 0.4447 |
+
+Ablation summary:
+
+- Seven MiniLM ablations were run for fixed 5-epoch comparisons.
+- Best test accuracy was `lr5e5` at 0.6008.
+- Best validation accuracy was `proj256` at 0.6011.
+- No ablation surpassed the full MiniLM run with early stopping.
+
+E5-large status:
+
+- `intfloat/e5-large-v2` is configured as the current larger encoder experiment.
+- It improved through epoch 3, reaching validation accuracy around 0.5517.
+- Epoch 4 collapsed to chance accuracy, so the next E5 attempt should lower the learning rate.
 
 ## Current Repository Pipeline
 
@@ -390,10 +429,10 @@ Optional classification head stabilizes learning.
 
 Compare against:
 
-- TF-IDF similarity
-- generic sentence embeddings
-- POS-template similarity
-- student-only classifier
+- BoW same-prompt similarity
+- BERTScore same-prompt similarity
+- BoW classifier
+- 1-4 gram classifier
 
 Explain why baselines are necessary.
 
@@ -424,12 +463,14 @@ Mention:
 - SLURM jobs for heavy steps
 - offline model cache on HPC
 
-### Slide 11: Expected Results / Analysis
+### Slide 11: Results / Analysis
 
-Expected analyses:
+Analyses to show:
 
-- contrastive > raw similarity baselines
-- set-level aggregation improves accuracy
+- MiniLM contrastive single-prompt accuracy is about 60.4%
+- top-2 accuracy is about 82.8%
+- set-level aggregation improves accuracy strongly
+- QA attribution is much easier than summarization attribution
 - confusion matrix reveals which teachers are hard to distinguish
 - weaker lineage pairs may be noisier than high-confidence pairs
 
@@ -445,11 +486,12 @@ Limitations:
 
 Future work:
 
-- add controlled LoRA-distilled students
-- use larger prompt banks
+- evaluate or stabilize the E5-large encoder with a lower learning rate
+- add Llama and SmolLM lineages after verifying runtime and storage
 - test harder same-family teacher sets
-- add paraphrase robustness
-- compare against latent structure/style features
+- add cross-dataset and paraphrase robustness tests
+- compare against additional latent style features
+- optionally add controlled LoRA-distilled students as a cleaner distillation baseline
 
 ## Visual Style Guidance
 

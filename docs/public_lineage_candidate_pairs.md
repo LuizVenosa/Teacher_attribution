@@ -2,6 +2,19 @@
 
 This document separates **directly runnable pairs** from pairs that are useful scientifically but weaker as attribution labels.
 
+## Current Use In The Project
+
+The completed paper-ready experiment uses only the four default pairs:
+
+- `gpt2 -> distilgpt2`
+- `qwen15_18b -> miniplm_qwen_200m`
+- `flan_t5_base -> lamini_flan_t5_248m`
+- `flan_t5_small -> lamini_flan_t5_77m`
+
+For these four pairs, teacher and student outputs have been generated for the main train/test setup, attribution pairs have been built, and the MiniLM contrastive encoder has been trained and evaluated. The extra Llama, SmolLM, and Qwen3 pairs below remain candidate extensions rather than completed main results.
+
+The recommended paper framing is to report the four-pair setup as the main controlled public-lineage experiment, then discuss Llama/SmolLM/Qwen3 expansion as future work unless those outputs are generated and evaluated before submission.
+
 ## Runnable Extended Pool
 
 These pairs have a public teacher checkpoint we can generate from and a public student checkpoint with model-card evidence of distillation or lineage.

@@ -42,6 +42,65 @@ evidence notes and recommended subset order before running the heavier models.
 
 There is no `make_sft_data.py`, no LoRA student training, and no generated student checkpoints.
 
+## Current Experiment Status
+
+Status as of 2026-05-16:
+
+- The clean 4-way public-lineage setup is generated and usable on the cluster.
+- Teacher and student outputs were generated for the four default pairs.
+- Test attribution pairs were built with 12,000 rows: 3,000 prompts x 4 student-teacher labels.
+- Full train generation completed with 29,742 prompts per teacher/student model, and train/validation attribution pairs were built for contrastive training.
+- The main completed encoder result is the MiniLM contrastive run using `sentence-transformers/all-MiniLM-L6-v2`.
+- The current default config is set to the larger `intfloat/e5-large-v2` encoder for follow-up experiments.
+
+Completed MiniLM contrastive result:
+
+| Split / setting | Accuracy | Top-2 accuracy | Macro ROC-AUC | Notes |
+|---|---:|---:|---:|---|
+| Validation, best checkpoint | 0.6055 | 0.8307 | 0.6822 | Best epoch 10, early stopped at epoch 14. |
+| Test, single prompt | 0.6044 | 0.8284 | 0.6814 | Main reportable test result. |
+| Test, set size 4 | 0.9000 | 0.9875 | 0.9060 | Averaged over prompt sets. |
+| Test, set size 8 | 0.9750 | 1.0000 | 0.9615 | Averaged over prompt sets. |
+| Test, set size 16+ | 1.0000 | 1.0000 | 0.9752+ | Averaged over prompt sets. |
+
+Single-prompt MiniLM test accuracy by task:
+
+| Task | Accuracy |
+|---|---:|
+| QA | 0.8418 |
+| Instruction following | 0.6090 |
+| Summarization | 0.4447 |
+
+MiniLM ablation summary:
+
+| Run | Test accuracy | Top-2 accuracy | Macro ROC-AUC | Interpretation |
+|---|---:|---:|---:|---|
+| `lr5e5` | 0.6008 | 0.8286 | 0.6779 | Best ablation by test accuracy. |
+| `temp003` | 0.6003 | 0.8286 | 0.6635 | Similar accuracy, weaker AUC. |
+| `cls010` | 0.5993 | 0.8295 | 0.6755 | Similar to baseline. |
+| `baseline_temp005_cls02_lr2e5` | 0.5988 | 0.8286 | 0.6769 | Five-epoch MiniLM baseline. |
+| `temp007` | 0.5976 | 0.8297 | 0.6843 | Best ablation AUC, not best accuracy. |
+| `proj256` | 0.5968 | 0.8289 | 0.6768 | Best validation accuracy among ablations, but not best test accuracy. |
+| `cls050` | 0.5955 | 0.8295 | 0.6775 | Higher classification weight did not help. |
+
+The ablations are useful for analysis, but none surpassed the full MiniLM run trained with early stopping.
+
+Current E5-large status:
+
+- `intfloat/e5-large-v2` is cached and configured as the default encoder.
+- The E5 run improved through epoch 3, reaching validation accuracy around 0.5517.
+- Epoch 4 collapsed to chance accuracy, suggesting an unstable learning rate or over-updating during full fine-tuning.
+- The next E5 attempt should use a smaller learning rate, such as `1e-5` or `5e-6`, and evaluate the best checkpoint before continuing long runs.
+
+Remaining project work:
+
+- Evaluate the best E5-large checkpoint if it has not already been evaluated.
+- Run a stabilized E5-large configuration with lower learning rate, or report E5-large as an ongoing scaling experiment.
+- Export plots from `results/contrastive_ablation/epoch_progression.csv` for validation accuracy and loss curves.
+- Add final tables for baseline results, MiniLM contrastive results, ablations, task/dataset breakdowns, and confusion matrices.
+- Decide whether to keep the paper at the 4-way public-lineage setup or add Llama/SmolLM candidates as future work.
+- Write the paper around the completed MiniLM result; E5-large can be either a final extra result or future work.
+
 ## Setup
 
 ```bash
@@ -63,10 +122,12 @@ PYTHONPATH=src python scripts/make_prompt_bank.py \
   --source who_taught_you_that \
   --local-data-dir external_datasets/who_taught_you_that \
   --datasets cnn_dailymail,sumpubmed,rotten_tomatoes,commonsenseqa,openbookqa,quarel,alpaca \
-  --train-size 13377 \
-  --val-size 1946 \
-  --test-size 3500
+  --train-size 30000 \
+  --val-size 3000 \
+  --test-size 3000
 ```
+
+The completed cluster run produced 29,742 train prompts after dataset availability and filtering, plus 3,000-prompt validation/test style evaluation files.
 
 For a tiny smoke test:
 
@@ -81,7 +142,7 @@ PYTHONPATH=src python scripts/make_prompt_bank.py \
 ## Cluster Execution
 
 ```bash
-cd /home/3191856/NLP_project/Teacher_attribution
+cd /mnt/beegfsstudents/home/3191856/NLP_project/Teacher_attribution
 mkdir -p logs
 
 # 1. Generate public teacher and public student outputs. No arrays.
@@ -93,8 +154,14 @@ sbatch jobs/04_build_public_lineage_attribution.sbatch
 # 3. Run baselines.
 sbatch jobs/06_eval_public_lineage.sbatch baselines
 
-# 4. Train contrastive encoder.
-sbatch jobs/05_train_public_lineage_contrastive.sbatch
+# 4a. Train the current default contrastive encoder. The default config is E5-large,
+# so use a long allocation.
+sbatch --time=24:00:00 jobs/05_train_public_lineage_contrastive.sbatch
+
+# 4b. Reproduce the MiniLM main run if the MiniLM configs are available on the cluster.
+MODELS_CONFIG=configs/public_lineage_models_minilm.yaml \
+ATTRIBUTION_CONFIG=configs/public_lineage_attribution_minilm_ablate.yaml \
+sbatch --time=08:00:00 jobs/05_train_public_lineage_contrastive.sbatch
 
 # 5. Evaluate set-level attribution.
 sbatch jobs/06_eval_public_lineage.sbatch encoder
@@ -141,30 +208,34 @@ PYTHONPATH=src python scripts/make_prompt_bank.py \
   --source who_taught_you_that \
   --local-data-dir external_datasets/who_taught_you_that \
   --datasets cnn_dailymail,sumpubmed,rotten_tomatoes,commonsenseqa,openbookqa,quarel,alpaca \
-  --train-size 13377 \
-  --val-size 1946 \
-  --test-size 3500
+  --train-size 30000 \
+  --val-size 3000 \
+  --test-size 3000
 ```
 
 This uses a balanced maximum across all seven WTYT task sources, so QuaRel and OpenBookQA do not disappear under the much larger summarization/review datasets.
 
-Then run the WTYT-style evaluator:
+Current baseline evaluator:
 
 ```bash
-sbatch jobs/07_eval_wtyt_style.sbatch
+sbatch jobs/06_eval_public_lineage.sbatch baselines
 ```
 
-It reports BoW, 1-4 gram, and POS-template classifiers over support sizes:
+It reports WTYT-style text baselines that are currently reproducible in this repo:
 
 ```text
-50, 200, 1000, 2000
+bow_same_prompt
+bertscore_same_prompt
+bow_classifier
+ngram_1_4_classifier
 ```
 
-Outputs:
+The POS-template baseline from the paper is intentionally excluded from the main comparison because it was not reliably replicated in the current environment.
+
+Output:
 
 ```text
-results/wtyt_style/public_lineage_wtyt_style_metrics.json
-results/wtyt_style/public_lineage_wtyt_style_metrics.csv
+results/baselines/public_lineage_test_metrics.json
 ```
 
 Use these as the directly comparable baseline table. Use the contrastive encoder results as the proposed-method table.
@@ -255,9 +326,11 @@ PYTHONPATH=src python scripts/make_prompt_bank.py \
 - `scripts/generate_public_teachers.py`: teacher response generation.
 - `scripts/generate_public_students.py`: public student response generation.
 - `scripts/build_attribution_pairs.py`: alignment into InfoNCE rows.
-- `scripts/run_baselines.py`: TF-IDF, sentence embedding, POS, and classifier baselines.
+- `scripts/run_baselines.py`: BoW similarity, BERTScore similarity, BoW classifier, and 1-4 gram classifier baselines.
 - `scripts/train_contrastive_encoder.py`: prompt-conditioned InfoNCE encoder.
 - `scripts/evaluate.py`: set-level attribution evaluation.
+- `scripts/evaluate_contrastive_probes.py`: frozen contrastive encoder probes plus response-only cosine baselines.
+
 ## Contrastive Training And Ablations
 
 The contrastive encoder uses a high epoch ceiling with validation early stopping. In `configs/public_lineage_attribution.yaml`:
@@ -266,16 +339,16 @@ The contrastive encoder uses a high epoch ceiling with validation early stopping
 num_epochs: 30
 early_stopping_metric: accuracy
 early_stopping_mode: max
-early_stopping_patience: 4
+early_stopping_patience: 6
 early_stopping_min_delta: 0.002
 ```
 
-This means training may run for up to 30 epochs, but it stops when validation accuracy has not improved by at least `0.002` for 4 consecutive epochs. The trainer saves:
+This means training may run for up to 30 epochs, but it stops when validation accuracy has not improved by at least `0.002` for 6 consecutive epochs. The trainer saves:
 
 ```text
-models/attribution_encoder/public_lineage_minilm_contrastive/best.pt
-models/attribution_encoder/public_lineage_minilm_contrastive/last.pt
-models/attribution_encoder/public_lineage_minilm_contrastive/training_metrics.json
+models/attribution_encoder/<run_name>/best.pt
+models/attribution_encoder/<run_name>/last.pt
+models/attribution_encoder/<run_name>/training_metrics.json
 ```
 
 Run the main contrastive training job:
@@ -290,11 +363,13 @@ A compact no-array ablation sweep is also available:
 sbatch jobs/05_ablate_public_lineage_contrastive.sbatch
 ```
 
-By default it runs a sequential compact sweep over temperature, classification-loss weight, learning rate, and one longer-context/projection setting. Results are written to:
+By default it runs a sequential compact sweep over temperature, classification-loss weight, learning rate, and projection size. The current compact sweep uses fixed 5-epoch runs and disables early stopping so curves are comparable. Results are written to:
 
 ```text
 results/contrastive_ablation/ablation_summary.csv
 results/contrastive_ablation/ablation_summary.json
+results/contrastive_ablation/eval_summary.csv
+results/contrastive_ablation/epoch_progression.csv
 models/attribution_encoder/public_lineage_ablations/
 ```
 
@@ -312,3 +387,50 @@ sbatch jobs/05_ablate_public_lineage_contrastive.sbatch
 ```
 
 Keep `MAX_RUNS` modest on the student cluster because this job runs experiments sequentially inside one allocation.
+
+## Contrastive Probe Evaluation
+
+The main encoder evaluation uses nearest-neighbor cosine retrieval in the learned teacher space. To check whether the learned embedding is more useful with a stronger but still simple decision rule, run the frozen-probe evaluation:
+
+```bash
+sbatch jobs/08_eval_contrastive_probes.sbatch
+```
+
+By default this evaluates the MiniLM checkpoint:
+
+```text
+models/attribution_encoder/public_lineage_minilm_contrastive/best.pt
+```
+
+and writes:
+
+```text
+results/contrastive/public_lineage_minilm_probe_metrics.json
+```
+
+The JSON includes four contrastive-encoder variants:
+
+```text
+cosine_retrieval
+classifier_head
+embedding_logreg
+cosine_score_logreg
+```
+
+It also includes simple response-only cosine baselines:
+
+```text
+bow_response_cosine
+tfidf_response_cosine
+sentence_response_cosine
+```
+
+These baselines compare each student output to the same-prompt candidate teacher outputs by cosine similarity only, so they are easier to compare directly against contrastive nearest-neighbor retrieval.
+
+Override paths or skip the sentence baseline if the checkpoint is not cached:
+
+```bash
+SKIP_SENTENCE_BASELINE=1 \
+ENCODER_OUTPUT=results/contrastive/public_lineage_minilm_probe_metrics_no_sentence.json \
+sbatch jobs/08_eval_contrastive_probes.sbatch
+```
