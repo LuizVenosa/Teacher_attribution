@@ -199,7 +199,7 @@ def plot_spaces(
         "flan_t5_small": "FLAN-T5-small lineage",
     }
 
-    fig, axes = plt.subplots(1, 2, figsize=(9.2, 4.0), dpi=dpi)
+    fig, axes = plt.subplots(1, 2, figsize=(7.0, 3.25), dpi=dpi)
     for ax, points, title in zip(
         axes,
         [rescale(raw_2d), rescale(contrastive_2d)],
@@ -216,7 +216,7 @@ def plot_spaces(
                 c=colors.get(teacher_id, None),
                 label=display.get(teacher_id, teacher_id),
             )
-        ax.set_title(title, fontsize=13, pad=8)
+        ax.set_title(title, fontsize=17, pad=8)
         ax.set_xticks([])
         ax.set_yticks([])
         ax.set_frame_on(False)
@@ -228,12 +228,11 @@ def plot_spaces(
         loc="lower center",
         ncol=2,
         frameon=False,
-        fontsize=9,
+        fontsize=12,
         markerscale=1.8,
-        bbox_to_anchor=(0.5, -0.025),
+        bbox_to_anchor=(0.5, -0.035),
     )
-    fig.suptitle("Teacher Lineage in Student Response Embeddings", fontsize=15, y=0.98)
-    fig.tight_layout(rect=[0, 0.08, 1, 0.94], w_pad=2.0)
+    fig.tight_layout(rect=[0, 0.13, 1, 0.98], w_pad=1.6)
 
     output = Path(output)
     output.parent.mkdir(parents=True, exist_ok=True)
