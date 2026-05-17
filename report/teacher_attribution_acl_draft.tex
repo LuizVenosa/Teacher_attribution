@@ -23,13 +23,21 @@ Bocconi University \\
 \maketitle
 
 \begin{abstract}
-Black-box distillation makes it possible to train student language models from teacher outputs, making model provenance difficult to verify from model cards alone.
-This project asks whether modern representation learning can substantially improve teacher detection from outputs.
-For each prompt, responses are generated from all candidate teachers and students, then a prompt-conditioned contrastive encoder pulls a student response toward its documented teacher and away from same-prompt alternatives.
-Direct retrieval reaches 60.44\% single-prompt accuracy, while a frozen logistic-regression probe over the learned embedding reaches 63.12\% accuracy and 89.11\% macro ROC-AUC, slightly above the strongest replicated lexical baseline at 62.17\%.
-Aggregating prompts strengthens the signal, reaching 97.5\% accuracy with eight prompts and 100\% with sixteen.
-The results suggest that public students preserve detectable teacher fingerprints, although attribution remains task-dependent.
+Teacher attribution asks whether the outputs of a student language model reveal which teacher model shaped it.
+Prior work mainly detects teacher traces with lexical and syntactic features, but these signals can mix teacher style with prompt content.
+This project tests whether a modern contrastive representation can improve teacher detection for public teacher-student lineages.
+For each prompt, candidate teachers and students generate responses; a prompt-conditioned MiniLM encoder is trained to pull each student response toward its documented teacher and away from same-prompt alternatives.
+On a balanced four-way public-lineage benchmark, direct contrastive retrieval reaches 60.44\% single-prompt accuracy, while a frozen logistic-regression probe over the learned embedding reaches 63.12\% accuracy and 89.11\% macro ROC-AUC, slightly above the strongest replicated lexical baseline at 62.17\%.
+Aggregating multiple prompts strengthens the lineage signal, reaching 97.5\% accuracy with eight prompts and 100\% with sixteen.
+The results suggest that teacher fingerprints survive public distillation, but that reliable attribution depends on task, aggregation, and stronger representations.
 \end{abstract}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{figures/00_latent_space_hero.png}
+\caption{t-SNE visualization of student response embeddings before and after contrastive training. Colors indicate documented teacher lineage.}
+\label{fig:latent_hero}
+\end{figure}
 
 \section{Introduction}
 
@@ -51,7 +59,7 @@ The main contributions are:
 \begin{itemize}
     \item a reproducible public-lineage teacher-attribution pipeline;
     \item a prompt-conditioned contrastive encoder for same-prompt student-teacher comparison;
-    \item an evaluation of whether the learned representation improves over lexical teacher-detection baselines.
+    \item an evaluation showing when the learned representation improves over lexical baselines and when task structure still dominates.
 \end{itemize}
 
 \section{Experiments}
@@ -64,6 +72,7 @@ Two pairs have explicit model-card evidence; the FLAN-T5 pairs are medium-confid
 \begin{table}[t]
 \centering
 \small
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{lll}
 \toprule
 Teacher ID & Teacher & Student \\
@@ -74,6 +83,7 @@ Teacher ID & Teacher & Student \\
 \texttt{flan\_t5\_small} & FLAN-T5-small & LaMini-FLAN-T5-77M \\
 \bottomrule
 \end{tabular}
+}
 \caption{Public teacher-student pairs used for attribution.}
 \label{tab:pairs}
 \end{table}
@@ -112,7 +122,7 @@ This probe tests whether teacher identity is linearly recoverable from the learn
 
 \subsection{Baselines and Metrics}
 
-The experiments reproduce WTYT-style baselines \citep{wadhwa-etal-2025-taught}: response-only BoW and TF-IDF similarity, BoW logistic regression, and 1--4 gram logistic regression.
+The experiments reproduce \textit{Who Taught You That?} (WTYT) baselines \citep{wadhwa-etal-2025-taught}: response-only BoW and TF-IDF similarity, BoW logistic regression, and 1--4 gram logistic regression.
 POS templates are omitted from the replicated table because their template-mining procedure was not reproduced reliably; their published POS results are used only as an external reference.
 
 The evaluation reports top-1 accuracy, top-2 accuracy, one-vs-rest ROC-AUC, confusion matrices, task and dataset breakdowns, and set-level accuracy.
@@ -150,6 +160,16 @@ Contrastive embedding probe & \textbf{63.12} & 83.84 & \textbf{89.11} \\
 
 Performance varies by task: the embedding probe reaches 84.63\% on QA, 68.20\% on instruction following, and 47.08\% on summarization.
 Dataset results match this pattern: Rotten Tomatoes, CommonsenseQA, and OpenBookQA exceed 83\%, while CNN/DailyMail and SumpubMed remain near chance.
+QA is the easiest setting, likely because answers preserve formatting, reasoning habits, and label choices; summarization is hardest because compression pushes different models toward similar high-level summaries.
+
+\subsection{What the Representation Learns}
+
+Figure~\ref{fig:latent_hero} gives a qualitative view of the learned space.
+In raw MiniLM embeddings, points of different teacher lineages are heavily mixed; the visible clusters are better explained by shared prompt type or dataset than by teacher identity.
+After contrastive training, GPT-2 and Qwen responses form more coherent lineage regions, and FLAN-T5-base and FLAN-T5-small become more separated than in the raw space.
+The figure is still not perfectly clustered by lineage.
+The large mixed region at the top of the contrastive panel is likely a residual task or dataset region rather than a teacher region: the quantitative breakdown shows that summarization is the weakest task, and summarization datasets are close to chance.
+This supports the main interpretation of the project: contrastive learning increases the visibility of teacher fingerprints, but it does not fully remove content and task effects.
 
 \subsection{Comparison to WTYT}
 
@@ -158,13 +178,14 @@ In their Table~2, POS templates average about 58.2\% accuracy, versus 53.9\% for
 On the public-lineage data, the embedding probe, a logistic-regression classifier on frozen contrastive student embeddings, improves over the replicated n-gram classifier by 0.95 points, or 1.5\% relative.
 It is also above their average POS result (63.12\% vs. about 58.2\%), but this is only a cross-experiment reference, not evidence of beating POS templates on an identical benchmark.
 
-\subsection{Set-Level Attribution}
+\subsection{Set-Level Attribution and Error Analysis}
 
 Attribution improves sharply when prompts are aggregated (Figure~\ref{fig:confusion_progression}).
 Here, aggregation means sampling several prompt-response pairs from the same student lineage and averaging their teacher scores before making one teacher prediction.
 For contrastive cosine retrieval, accuracy rises to 73.75\% with two prompts, 90.0\% with four, 97.5\% with eight, and 100\% with sixteen.
 The confusion matrices show why: single-prompt predictions often collapse Qwen and FLAN outputs toward GPT-2, while aggregation removes most off-diagonal mass.
 By four prompts, the main remaining ambiguity is between the two FLAN lineages; by sixteen prompts, all sampled sets are classified correctly.
+This matches the single-prompt error analysis: lineages that are close in model family require more evidence, while lineages with more distinctive response behavior separate quickly.
 
 \begin{figure*}[t]
 \centering
@@ -173,25 +194,20 @@ By four prompts, the main remaining ambiguity is between the two FLAN lineages; 
 \label{fig:confusion_progression}
 \end{figure*}
 
-\section{Discussion}
-
-QA is the strongest task, likely because answers preserve formatting, reasoning habits, and label explanations.
-Summarization is hardest because compression pushes models toward similar high-level summaries.
-The set-level confusion matrices show that aggregation removes many broad teacher confusions, but the FLAN-T5-base and FLAN-T5-small lineages remain the last difficult pair, which is expected for nearby same-family checkpoints.
-Significance tests were not run, so small margins such as the 0.95 point gain over n-grams should be interpreted cautiously.
-
-\subsection{Ablations and Future Encoders}
+\subsection{Ablations and Training Behavior}
 
 Seven fixed five-epoch MiniLM ablations vary temperature, classification weight, learning rate, and projection dimension.
 The best test ablation was \texttt{lr5e5} at 60.08\%, below the full early-stopped MiniLM model; the best validation ablation reached 59.68\% on test.
 Together with the training curve, this suggests that MiniLM is close to saturated under this setup: loss keeps falling while validation accuracy flattens around 60--61\%.
 Future work should test larger or more style-sensitive encoders.
+Significance tests were not run, so small margins such as the 0.95 point gain over n-grams should be interpreted cautiously.
 
-\begin{center}
+\begin{figure}[t]
 \centering
 \includegraphics[width=.94\columnwidth]{figures/01_training_loss_accuracy.png}
-{\small \textbf{Figure 2:} Loss decreases while validation accuracy plateaus.}
-\end{center}
+\caption{Training loss continues to decrease after validation accuracy begins to plateau, suggesting that the compact MiniLM encoder is close to saturated under this setup.}
+\label{fig:training_curve}
+\end{figure}
 
 \section{Related Work}
 
@@ -208,7 +224,8 @@ Teacher attribution has the same goal: capture response style and behavior rathe
 
 This project builds a public-lineage teacher attribution pipeline to test whether modern representation learning improves teacher detection.
 On a four-way task, MiniLM reaches 60.44\% with direct retrieval and 63.12\% with a frozen linear probe, slightly above the strongest replicated lexical baseline and competitive with the average POS-template result of \citet{wadhwa-etal-2025-taught}.
-The improvement is not large enough to claim a decisive single-prompt breakthrough, but set-level aggregation performs much better, supporting the idea that student outputs preserve teacher fingerprints across prompts.
+The improvement is not large enough to claim a decisive single-prompt breakthrough, but the latent-space visualization and set-level confusion matrices show that contrastive training makes teacher lineage more recoverable.
+Set-level aggregation performs much better, supporting the idea that student outputs preserve teacher fingerprints across prompts.
 Future work should add more verified lineages, test larger style-sensitive encoders, and evaluate harder cross-dataset or paraphrased-prompt settings.
 
 \section*{Limitations}
@@ -219,6 +236,10 @@ The same-prompt setting assumes candidate teacher responses are available for th
 Generation settings may also affect attribution because decoding style can change surface behavior.
 The POS-template method from \citet{wadhwa-etal-2025-taught} is compared only through their published results, not rerun on the same public-lineage data.
 Finally, the encoder experiments use a compact MiniLM backbone; larger or more authorship/style-sensitive encoders may yield stronger attribution results.
+
+\section*{Acknowledgements}
+
+The author thanks the Language Technology course staff for guidance on project design and report structure.
 
 \bibliography{references}
 
