@@ -1,0 +1,2486 @@
+{
+  "methods": {
+    "bertscore_same_prompt": {
+      "error": "AttributeError(\"module 'evaluate' has no attribute 'load'\")"
+    },
+    "bow_classifier": {
+      "accuracy": 0.5835833333333333,
+      "accuracy_by_dataset": {
+        "alpaca": 0.4565,
+        "cnn_dailymail": 0.4605,
+        "commonsenseqa": 0.682,
+        "openbookqa": 0.654,
+        "rotten_tomatoes": 0.693,
+        "sumpubmed": 0.5555
+      },
+      "accuracy_by_student_teacher_pair": {
+        "distilgpt2->gpt2": 0.5233333333333333,
+        "lamini_flan_t5_248m->flan_t5_base": 0.5333333333333333,
+        "lamini_flan_t5_77m->flan_t5_small": 0.653,
+        "miniplm_qwen_200m->qwen15_18b": 0.6246666666666667
+      },
+      "accuracy_by_task": {
+        "instruction_following": 0.4565,
+        "qa": 0.668,
+        "summarization": 0.5696666666666667
+      },
+      "breakdown_by_dataset": {
+        "alpaca": {
+          "accuracy": 0.4565,
+          "confusion_matrix": [
+            [
+              135,
+              97,
+              25,
+              243
+            ],
+            [
+              132,
+              292,
+              30,
+              46
+            ],
+            [
+              21,
+              16,
+              199,
+              264
+            ],
+            [
+              20,
+              19,
+              174,
+              287
+            ]
+          ],
+          "num_rows": 2000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 428,
+            "flan_t5_small": 840,
+            "gpt2": 308,
+            "qwen15_18b": 424
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": 0.726312,
+            "flan_t5_small": 0.7267906666666667,
+            "gpt2": 0.6477440000000001,
+            "qwen15_18b": 0.8230913333333333
+          },
+          "roc_auc_ovr_macro": 0.7309845,
+          "roc_auc_ovr_micro": 0.7514384999999999,
+          "roc_auc_ovr_weighted": 0.7309845,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.778,
+          "true_teacher_counts": {
+            "flan_t5_base": 500,
+            "flan_t5_small": 500,
+            "gpt2": 500,
+            "qwen15_18b": 500
+          }
+        },
+        "cnn_dailymail": {
+          "accuracy": 0.4605,
+          "confusion_matrix": [
+            [
+              193,
+              180,
+              47,
+              80
+            ],
+            [
+              173,
+              242,
+              25,
+              60
+            ],
+            [
+              30,
+              30,
+              256,
+              184
+            ],
+            [
+              49,
+              43,
+              178,
+              230
+            ]
+          ],
+          "num_rows": 2000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 506,
+            "flan_t5_small": 554,
+            "gpt2": 445,
+            "qwen15_18b": 495
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": 0.787252,
+            "flan_t5_small": 0.7373586666666666,
+            "gpt2": 0.7038686666666666,
+            "qwen15_18b": 0.7725366666666666
+          },
+          "roc_auc_ovr_macro": 0.750254,
+          "roc_auc_ovr_micro": 0.7527930833333333,
+          "roc_auc_ovr_weighted": 0.7502539999999999,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.8055,
+          "true_teacher_counts": {
+            "flan_t5_base": 500,
+            "flan_t5_small": 500,
+            "gpt2": 500,
+            "qwen15_18b": 500
+          }
+        },
+        "commonsenseqa": {
+          "accuracy": 0.682,
+          "confusion_matrix": [
+            [
+              353,
+              75,
+              30,
+              42
+            ],
+            [
+              95,
+              366,
+              15,
+              24
+            ],
+            [
+              2,
+              3,
+              255,
+              240
+            ],
+            [
+              0,
+              0,
+              110,
+              390
+            ]
+          ],
+          "num_rows": 2000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 410,
+            "flan_t5_small": 696,
+            "gpt2": 450,
+            "qwen15_18b": 444
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": 0.8591173333333333,
+            "flan_t5_small": 0.8565646666666666,
+            "gpt2": 0.8245853333333333,
+            "qwen15_18b": 0.907942
+          },
+          "roc_auc_ovr_macro": 0.8620523333333332,
+          "roc_auc_ovr_micro": 0.8876953750000001,
+          "roc_auc_ovr_weighted": 0.8620523333333333,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.9485,
+          "true_teacher_counts": {
+            "flan_t5_base": 500,
+            "flan_t5_small": 500,
+            "gpt2": 500,
+            "qwen15_18b": 500
+          }
+        },
+        "openbookqa": {
+          "accuracy": 0.654,
+          "confusion_matrix": [
+            [
+              314,
+              95,
+              45,
+              46
+            ],
+            [
+              79,
+              387,
+              21,
+              13
+            ],
+            [
+              4,
+              2,
+              252,
+              242
+            ],
+            [
+              2,
+              0,
+              143,
+              355
+            ]
+          ],
+          "num_rows": 2000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 461,
+            "flan_t5_small": 656,
+            "gpt2": 399,
+            "qwen15_18b": 484
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": 0.8482833333333333,
+            "flan_t5_small": 0.8531173333333333,
+            "gpt2": 0.7718286666666667,
+            "qwen15_18b": 0.9034953333333334
+          },
+          "roc_auc_ovr_macro": 0.8441811666666668,
+          "roc_auc_ovr_micro": 0.8711140416666667,
+          "roc_auc_ovr_weighted": 0.8441811666666666,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.9385,
+          "true_teacher_counts": {
+            "flan_t5_base": 500,
+            "flan_t5_small": 500,
+            "gpt2": 500,
+            "qwen15_18b": 500
+          }
+        },
+        "rotten_tomatoes": {
+          "accuracy": 0.693,
+          "confusion_matrix": [
+            [
+              320,
+              130,
+              27,
+              23
+            ],
+            [
+              105,
+              321,
+              16,
+              58
+            ],
+            [
+              18,
+              3,
+              349,
+              130
+            ],
+            [
+              9,
+              3,
+              92,
+              396
+            ]
+          ],
+          "num_rows": 2000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 484,
+            "flan_t5_small": 607,
+            "gpt2": 452,
+            "qwen15_18b": 457
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": 0.9203926666666667,
+            "flan_t5_small": 0.9363526666666666,
+            "gpt2": 0.8589079999999998,
+            "qwen15_18b": 0.8952093333333333
+          },
+          "roc_auc_ovr_macro": 0.9027156666666666,
+          "roc_auc_ovr_micro": 0.9045905833333334,
+          "roc_auc_ovr_weighted": 0.9027156666666666,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.9195,
+          "true_teacher_counts": {
+            "flan_t5_base": 500,
+            "flan_t5_small": 500,
+            "gpt2": 500,
+            "qwen15_18b": 500
+          }
+        },
+        "sumpubmed": {
+          "accuracy": 0.5555,
+          "confusion_matrix": [
+            [
+              255,
+              141,
+              54,
+              50
+            ],
+            [
+              135,
+              266,
+              53,
+              46
+            ],
+            [
+              18,
+              18,
+              289,
+              175
+            ],
+            [
+              22,
+              17,
+              160,
+              301
+            ]
+          ],
+          "num_rows": 2000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 556,
+            "flan_t5_small": 572,
+            "gpt2": 430,
+            "qwen15_18b": 442
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": 0.818256,
+            "flan_t5_small": 0.8206573333333333,
+            "gpt2": 0.7918786666666666,
+            "qwen15_18b": 0.850888
+          },
+          "roc_auc_ovr_macro": 0.8204199999999999,
+          "roc_auc_ovr_micro": 0.8181576250000001,
+          "roc_auc_ovr_weighted": 0.82042,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.865,
+          "true_teacher_counts": {
+            "flan_t5_base": 500,
+            "flan_t5_small": 500,
+            "gpt2": 500,
+            "qwen15_18b": 500
+          }
+        }
+      },
+      "breakdown_by_student_teacher_pair": {
+        "distilgpt2->gpt2": {
+          "accuracy": 0.5233333333333333,
+          "confusion_matrix": [
+            [
+              1570,
+              718,
+              228,
+              484
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ]
+          ],
+          "num_rows": 3000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 228,
+            "flan_t5_small": 484,
+            "gpt2": 1570,
+            "qwen15_18b": 718
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": null,
+            "flan_t5_small": null,
+            "gpt2": null,
+            "qwen15_18b": null
+          },
+          "roc_auc_ovr_macro": NaN,
+          "roc_auc_ovr_micro": 0.7770326111111112,
+          "roc_auc_ovr_weighted": NaN,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.7573333333333333,
+          "true_teacher_counts": {
+            "flan_t5_base": 0,
+            "flan_t5_small": 0,
+            "gpt2": 3000,
+            "qwen15_18b": 0
+          }
+        },
+        "lamini_flan_t5_248m->flan_t5_base": {
+          "accuracy": 0.5333333333333333,
+          "confusion_matrix": [
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              93,
+              72,
+              1600,
+              1235
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ]
+          ],
+          "num_rows": 3000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 1600,
+            "flan_t5_small": 1235,
+            "gpt2": 93,
+            "qwen15_18b": 72
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": null,
+            "flan_t5_small": null,
+            "gpt2": null,
+            "qwen15_18b": null
+          },
+          "roc_auc_ovr_macro": NaN,
+          "roc_auc_ovr_micro": 0.8443680185185185,
+          "roc_auc_ovr_weighted": NaN,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.9366666666666666,
+          "true_teacher_counts": {
+            "flan_t5_base": 3000,
+            "flan_t5_small": 0,
+            "gpt2": 0,
+            "qwen15_18b": 0
+          }
+        },
+        "lamini_flan_t5_77m->flan_t5_small": {
+          "accuracy": 0.653,
+          "confusion_matrix": [
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              102,
+              82,
+              857,
+              1959
+            ]
+          ],
+          "num_rows": 3000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 857,
+            "flan_t5_small": 1959,
+            "gpt2": 102,
+            "qwen15_18b": 82
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": null,
+            "flan_t5_small": null,
+            "gpt2": null,
+            "qwen15_18b": null
+          },
+          "roc_auc_ovr_macro": NaN,
+          "roc_auc_ovr_micro": 0.8504577407407409,
+          "roc_auc_ovr_weighted": NaN,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.9333333333333333,
+          "true_teacher_counts": {
+            "flan_t5_base": 0,
+            "flan_t5_small": 3000,
+            "gpt2": 0,
+            "qwen15_18b": 0
+          }
+        },
+        "miniplm_qwen_200m->qwen15_18b": {
+          "accuracy": 0.6246666666666667,
+          "confusion_matrix": [
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              719,
+              1874,
+              160,
+              247
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ]
+          ],
+          "num_rows": 3000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 160,
+            "flan_t5_small": 247,
+            "gpt2": 719,
+            "qwen15_18b": 1874
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": null,
+            "flan_t5_small": null,
+            "gpt2": null,
+            "qwen15_18b": null
+          },
+          "roc_auc_ovr_macro": NaN,
+          "roc_auc_ovr_micro": 0.8725107222222221,
+          "roc_auc_ovr_weighted": NaN,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.876,
+          "true_teacher_counts": {
+            "flan_t5_base": 0,
+            "flan_t5_small": 0,
+            "gpt2": 0,
+            "qwen15_18b": 3000
+          }
+        }
+      },
+      "breakdown_by_task": {
+        "instruction_following": {
+          "accuracy": 0.4565,
+          "confusion_matrix": [
+            [
+              135,
+              97,
+              25,
+              243
+            ],
+            [
+              132,
+              292,
+              30,
+              46
+            ],
+            [
+              21,
+              16,
+              199,
+              264
+            ],
+            [
+              20,
+              19,
+              174,
+              287
+            ]
+          ],
+          "num_rows": 2000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 428,
+            "flan_t5_small": 840,
+            "gpt2": 308,
+            "qwen15_18b": 424
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": 0.726312,
+            "flan_t5_small": 0.7267906666666667,
+            "gpt2": 0.6477440000000001,
+            "qwen15_18b": 0.8230913333333333
+          },
+          "roc_auc_ovr_macro": 0.7309845,
+          "roc_auc_ovr_micro": 0.7514384999999999,
+          "roc_auc_ovr_weighted": 0.7309845,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.778,
+          "true_teacher_counts": {
+            "flan_t5_base": 500,
+            "flan_t5_small": 500,
+            "gpt2": 500,
+            "qwen15_18b": 500
+          }
+        },
+        "qa": {
+          "accuracy": 0.668,
+          "confusion_matrix": [
+            [
+              667,
+              170,
+              75,
+              88
+            ],
+            [
+              174,
+              753,
+              36,
+              37
+            ],
+            [
+              6,
+              5,
+              507,
+              482
+            ],
+            [
+              2,
+              0,
+              253,
+              745
+            ]
+          ],
+          "num_rows": 4000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 871,
+            "flan_t5_small": 1352,
+            "gpt2": 849,
+            "qwen15_18b": 928
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": 0.8538724999999999,
+            "flan_t5_small": 0.8548413333333333,
+            "gpt2": 0.7976521666666667,
+            "qwen15_18b": 0.9056838333333332
+          },
+          "roc_auc_ovr_macro": 0.8530124583333333,
+          "roc_auc_ovr_micro": 0.87933,
+          "roc_auc_ovr_weighted": 0.8530124583333333,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.9435,
+          "true_teacher_counts": {
+            "flan_t5_base": 1000,
+            "flan_t5_small": 1000,
+            "gpt2": 1000,
+            "qwen15_18b": 1000
+          }
+        },
+        "summarization": {
+          "accuracy": 0.5696666666666667,
+          "confusion_matrix": [
+            [
+              768,
+              451,
+              128,
+              153
+            ],
+            [
+              413,
+              829,
+              94,
+              164
+            ],
+            [
+              66,
+              51,
+              894,
+              489
+            ],
+            [
+              80,
+              63,
+              430,
+              927
+            ]
+          ],
+          "num_rows": 6000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 1546,
+            "flan_t5_small": 1733,
+            "gpt2": 1327,
+            "qwen15_18b": 1394
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": 0.843031037037037,
+            "flan_t5_small": 0.835467037037037,
+            "gpt2": 0.7821109629629628,
+            "qwen15_18b": 0.8395557777777779
+          },
+          "roc_auc_ovr_macro": 0.8250412037037036,
+          "roc_auc_ovr_micro": 0.8266086203703703,
+          "roc_auc_ovr_weighted": 0.8250412037037036,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.8633333333333333,
+          "true_teacher_counts": {
+            "flan_t5_base": 1500,
+            "flan_t5_small": 1500,
+            "gpt2": 1500,
+            "qwen15_18b": 1500
+          }
+        }
+      },
+      "confusion_matrix": [
+        [
+          1570,
+          718,
+          228,
+          484
+        ],
+        [
+          719,
+          1874,
+          160,
+          247
+        ],
+        [
+          93,
+          72,
+          1600,
+          1235
+        ],
+        [
+          102,
+          82,
+          857,
+          1959
+        ]
+      ],
+      "roc_auc_by_teacher": {
+        "flan_t5_base": 0.8315060000000001,
+        "flan_t5_small": 0.8276606481481483,
+        "gpt2": 0.7614839814814816,
+        "qwen15_18b": 0.8551110185185186
+      },
+      "roc_auc_ovr_macro": 0.8189404120370372,
+      "roc_auc_ovr_micro": 0.8294020081018519,
+      "roc_auc_ovr_weighted": 0.8189404120370372,
+      "teacher_ids": [
+        "gpt2",
+        "qwen15_18b",
+        "flan_t5_base",
+        "flan_t5_small"
+      ],
+      "top2_accuracy": 0.8758333333333334
+    },
+    "bow_same_prompt": {
+      "accuracy": 0.3283333333333333,
+      "accuracy_by_dataset": {
+        "alpaca": 0.3385,
+        "cnn_dailymail": 0.38,
+        "commonsenseqa": 0.3055,
+        "openbookqa": 0.3165,
+        "rotten_tomatoes": 0.2775,
+        "sumpubmed": 0.352
+      },
+      "accuracy_by_student_teacher_pair": {
+        "distilgpt2->gpt2": 0.5026666666666667,
+        "lamini_flan_t5_248m->flan_t5_base": 0.265,
+        "lamini_flan_t5_77m->flan_t5_small": 0.111,
+        "miniplm_qwen_200m->qwen15_18b": 0.43466666666666665
+      },
+      "accuracy_by_task": {
+        "instruction_following": 0.3385,
+        "qa": 0.311,
+        "summarization": 0.3365
+      },
+      "breakdown_by_dataset": {
+        "alpaca": {
+          "accuracy": 0.3385,
+          "confusion_matrix": [
+            [
+              333,
+              89,
+              42,
+              36
+            ],
+            [
+              187,
+              178,
+              66,
+              69
+            ],
+            [
+              84,
+              262,
+              104,
+              50
+            ],
+            [
+              90,
+              261,
+              87,
+              62
+            ]
+          ],
+          "num_rows": 2000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 299,
+            "flan_t5_small": 217,
+            "gpt2": 694,
+            "qwen15_18b": 790
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": 0.59629,
+            "flan_t5_small": 0.5525233333333333,
+            "gpt2": 0.36052999999999996,
+            "qwen15_18b": 0.5300786666666668
+          },
+          "roc_auc_ovr_macro": 0.5098555,
+          "roc_auc_ovr_micro": 0.5160963749999999,
+          "roc_auc_ovr_weighted": 0.5098555,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.5855,
+          "true_teacher_counts": {
+            "flan_t5_base": 500,
+            "flan_t5_small": 500,
+            "gpt2": 500,
+            "qwen15_18b": 500
+          }
+        },
+        "cnn_dailymail": {
+          "accuracy": 0.38,
+          "confusion_matrix": [
+            [
+              236,
+              175,
+              47,
+              42
+            ],
+            [
+              193,
+              219,
+              44,
+              44
+            ],
+            [
+              83,
+              114,
+              168,
+              135
+            ],
+            [
+              108,
+              122,
+              133,
+              137
+            ]
+          ],
+          "num_rows": 2000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 392,
+            "flan_t5_small": 358,
+            "gpt2": 620,
+            "qwen15_18b": 630
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": 0.7104853333333334,
+            "flan_t5_small": 0.689374,
+            "gpt2": 0.4745546666666666,
+            "qwen15_18b": 0.5177093333333334
+          },
+          "roc_auc_ovr_macro": 0.5980308333333334,
+          "roc_auc_ovr_micro": 0.5975562083333333,
+          "roc_auc_ovr_weighted": 0.5980308333333333,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.6765,
+          "true_teacher_counts": {
+            "flan_t5_base": 500,
+            "flan_t5_small": 500,
+            "gpt2": 500,
+            "qwen15_18b": 500
+          }
+        },
+        "commonsenseqa": {
+          "accuracy": 0.3055,
+          "confusion_matrix": [
+            [
+              226,
+              166,
+              96,
+              12
+            ],
+            [
+              89,
+              176,
+              205,
+              30
+            ],
+            [
+              76,
+              212,
+              204,
+              8
+            ],
+            [
+              184,
+              226,
+              85,
+              5
+            ]
+          ],
+          "num_rows": 2000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 590,
+            "flan_t5_small": 55,
+            "gpt2": 575,
+            "qwen15_18b": 780
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": 0.6247,
+            "flan_t5_small": 0.4648886666666667,
+            "gpt2": 0.4661173333333335,
+            "qwen15_18b": 0.6694766666666667
+          },
+          "roc_auc_ovr_macro": 0.5562956666666667,
+          "roc_auc_ovr_micro": 0.5514537500000001,
+          "roc_auc_ovr_weighted": 0.5562956666666666,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.547,
+          "true_teacher_counts": {
+            "flan_t5_base": 500,
+            "flan_t5_small": 500,
+            "gpt2": 500,
+            "qwen15_18b": 500
+          }
+        },
+        "openbookqa": {
+          "accuracy": 0.3165,
+          "confusion_matrix": [
+            [
+              287,
+              134,
+              76,
+              3
+            ],
+            [
+              111,
+              197,
+              186,
+              6
+            ],
+            [
+              141,
+              210,
+              147,
+              2
+            ],
+            [
+              211,
+              200,
+              87,
+              2
+            ]
+          ],
+          "num_rows": 2000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 496,
+            "flan_t5_small": 13,
+            "gpt2": 750,
+            "qwen15_18b": 741
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": 0.5325926666666667,
+            "flan_t5_small": 0.495272,
+            "gpt2": 0.5028893333333333,
+            "qwen15_18b": 0.6653606666666666
+          },
+          "roc_auc_ovr_macro": 0.5490286666666667,
+          "roc_auc_ovr_micro": 0.5422181666666667,
+          "roc_auc_ovr_weighted": 0.5490286666666667,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.5305,
+          "true_teacher_counts": {
+            "flan_t5_base": 500,
+            "flan_t5_small": 500,
+            "gpt2": 500,
+            "qwen15_18b": 500
+          }
+        },
+        "rotten_tomatoes": {
+          "accuracy": 0.2775,
+          "confusion_matrix": [
+            [
+              181,
+              227,
+              31,
+              61
+            ],
+            [
+              181,
+              250,
+              30,
+              39
+            ],
+            [
+              111,
+              250,
+              61,
+              78
+            ],
+            [
+              93,
+              286,
+              58,
+              63
+            ]
+          ],
+          "num_rows": 2000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 180,
+            "flan_t5_small": 241,
+            "gpt2": 566,
+            "qwen15_18b": 1013
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": 0.5497586666666666,
+            "flan_t5_small": 0.49620733333333333,
+            "gpt2": 0.5429053333333334,
+            "qwen15_18b": 0.5690533333333334
+          },
+          "roc_auc_ovr_macro": 0.5394811666666667,
+          "roc_auc_ovr_micro": 0.5311359583333334,
+          "roc_auc_ovr_weighted": 0.5394811666666667,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.5545,
+          "true_teacher_counts": {
+            "flan_t5_base": 500,
+            "flan_t5_small": 500,
+            "gpt2": 500,
+            "qwen15_18b": 500
+          }
+        },
+        "sumpubmed": {
+          "accuracy": 0.352,
+          "confusion_matrix": [
+            [
+              245,
+              215,
+              21,
+              19
+            ],
+            [
+              187,
+              284,
+              13,
+              16
+            ],
+            [
+              151,
+              165,
+              111,
+              73
+            ],
+            [
+              173,
+              176,
+              87,
+              64
+            ]
+          ],
+          "num_rows": 2000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 232,
+            "flan_t5_small": 172,
+            "gpt2": 756,
+            "qwen15_18b": 840
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": 0.6965213333333332,
+            "flan_t5_small": 0.6023173333333334,
+            "gpt2": 0.4998746666666667,
+            "qwen15_18b": 0.5664186666666666
+          },
+          "roc_auc_ovr_macro": 0.591283,
+          "roc_auc_ovr_micro": 0.5752780416666666,
+          "roc_auc_ovr_weighted": 0.591283,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.624,
+          "true_teacher_counts": {
+            "flan_t5_base": 500,
+            "flan_t5_small": 500,
+            "gpt2": 500,
+            "qwen15_18b": 500
+          }
+        }
+      },
+      "breakdown_by_student_teacher_pair": {
+        "distilgpt2->gpt2": {
+          "accuracy": 0.5026666666666667,
+          "confusion_matrix": [
+            [
+              1508,
+              1006,
+              313,
+              173
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ]
+          ],
+          "num_rows": 3000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 313,
+            "flan_t5_small": 173,
+            "gpt2": 1508,
+            "qwen15_18b": 1006
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": null,
+            "flan_t5_small": null,
+            "gpt2": null,
+            "qwen15_18b": null
+          },
+          "roc_auc_ovr_macro": NaN,
+          "roc_auc_ovr_micro": 0.6171069814814814,
+          "roc_auc_ovr_weighted": NaN,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.7916666666666666,
+          "true_teacher_counts": {
+            "flan_t5_base": 0,
+            "flan_t5_small": 0,
+            "gpt2": 3000,
+            "qwen15_18b": 0
+          }
+        },
+        "lamini_flan_t5_248m->flan_t5_base": {
+          "accuracy": 0.265,
+          "confusion_matrix": [
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              646,
+              1213,
+              795,
+              346
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ]
+          ],
+          "num_rows": 3000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 795,
+            "flan_t5_small": 346,
+            "gpt2": 646,
+            "qwen15_18b": 1213
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": null,
+            "flan_t5_small": null,
+            "gpt2": null,
+            "qwen15_18b": null
+          },
+          "roc_auc_ovr_macro": NaN,
+          "roc_auc_ovr_micro": 0.5307897037037037,
+          "roc_auc_ovr_weighted": NaN,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.488,
+          "true_teacher_counts": {
+            "flan_t5_base": 3000,
+            "flan_t5_small": 0,
+            "gpt2": 0,
+            "qwen15_18b": 0
+          }
+        },
+        "lamini_flan_t5_77m->flan_t5_small": {
+          "accuracy": 0.111,
+          "confusion_matrix": [
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              859,
+              1271,
+              537,
+              333
+            ]
+          ],
+          "num_rows": 3000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 537,
+            "flan_t5_small": 333,
+            "gpt2": 859,
+            "qwen15_18b": 1271
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": null,
+            "flan_t5_small": null,
+            "gpt2": null,
+            "qwen15_18b": null
+          },
+          "roc_auc_ovr_macro": NaN,
+          "roc_auc_ovr_micro": 0.3815975925925926,
+          "roc_auc_ovr_weighted": NaN,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.26566666666666666,
+          "true_teacher_counts": {
+            "flan_t5_base": 0,
+            "flan_t5_small": 3000,
+            "gpt2": 0,
+            "qwen15_18b": 0
+          }
+        },
+        "miniplm_qwen_200m->qwen15_18b": {
+          "accuracy": 0.43466666666666665,
+          "confusion_matrix": [
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              948,
+              1304,
+              544,
+              204
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ]
+          ],
+          "num_rows": 3000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 544,
+            "flan_t5_small": 204,
+            "gpt2": 948,
+            "qwen15_18b": 1304
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": null,
+            "flan_t5_small": null,
+            "gpt2": null,
+            "qwen15_18b": null
+          },
+          "roc_auc_ovr_macro": NaN,
+          "roc_auc_ovr_micro": 0.6742929074074075,
+          "roc_auc_ovr_weighted": NaN,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.8,
+          "true_teacher_counts": {
+            "flan_t5_base": 0,
+            "flan_t5_small": 0,
+            "gpt2": 0,
+            "qwen15_18b": 3000
+          }
+        }
+      },
+      "breakdown_by_task": {
+        "instruction_following": {
+          "accuracy": 0.3385,
+          "confusion_matrix": [
+            [
+              333,
+              89,
+              42,
+              36
+            ],
+            [
+              187,
+              178,
+              66,
+              69
+            ],
+            [
+              84,
+              262,
+              104,
+              50
+            ],
+            [
+              90,
+              261,
+              87,
+              62
+            ]
+          ],
+          "num_rows": 2000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 299,
+            "flan_t5_small": 217,
+            "gpt2": 694,
+            "qwen15_18b": 790
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": 0.59629,
+            "flan_t5_small": 0.5525233333333333,
+            "gpt2": 0.36052999999999996,
+            "qwen15_18b": 0.5300786666666668
+          },
+          "roc_auc_ovr_macro": 0.5098555,
+          "roc_auc_ovr_micro": 0.5160963749999999,
+          "roc_auc_ovr_weighted": 0.5098555,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.5855,
+          "true_teacher_counts": {
+            "flan_t5_base": 500,
+            "flan_t5_small": 500,
+            "gpt2": 500,
+            "qwen15_18b": 500
+          }
+        },
+        "qa": {
+          "accuracy": 0.311,
+          "confusion_matrix": [
+            [
+              513,
+              300,
+              172,
+              15
+            ],
+            [
+              200,
+              373,
+              391,
+              36
+            ],
+            [
+              217,
+              422,
+              351,
+              10
+            ],
+            [
+              395,
+              426,
+              172,
+              7
+            ]
+          ],
+          "num_rows": 4000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 1086,
+            "flan_t5_small": 68,
+            "gpt2": 1325,
+            "qwen15_18b": 1521
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": 0.5794368333333333,
+            "flan_t5_small": 0.480084,
+            "gpt2": 0.4858548333333333,
+            "qwen15_18b": 0.6655003333333334
+          },
+          "roc_auc_ovr_macro": 0.552719,
+          "roc_auc_ovr_micro": 0.5466910937499999,
+          "roc_auc_ovr_weighted": 0.552719,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.53875,
+          "true_teacher_counts": {
+            "flan_t5_base": 1000,
+            "flan_t5_small": 1000,
+            "gpt2": 1000,
+            "qwen15_18b": 1000
+          }
+        },
+        "summarization": {
+          "accuracy": 0.3365,
+          "confusion_matrix": [
+            [
+              662,
+              617,
+              99,
+              122
+            ],
+            [
+              561,
+              753,
+              87,
+              99
+            ],
+            [
+              345,
+              529,
+              340,
+              286
+            ],
+            [
+              374,
+              584,
+              278,
+              264
+            ]
+          ],
+          "num_rows": 6000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 804,
+            "flan_t5_small": 771,
+            "gpt2": 1942,
+            "qwen15_18b": 2483
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": 0.6451338518518519,
+            "flan_t5_small": 0.5928364444444445,
+            "gpt2": 0.5025245185185185,
+            "qwen15_18b": 0.5508947407407407
+          },
+          "roc_auc_ovr_macro": 0.572847388888889,
+          "roc_auc_ovr_micro": 0.567550787037037,
+          "roc_auc_ovr_weighted": 0.5728473888888889,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.6183333333333333,
+          "true_teacher_counts": {
+            "flan_t5_base": 1500,
+            "flan_t5_small": 1500,
+            "gpt2": 1500,
+            "qwen15_18b": 1500
+          }
+        }
+      },
+      "confusion_matrix": [
+        [
+          1508,
+          1006,
+          313,
+          173
+        ],
+        [
+          948,
+          1304,
+          544,
+          204
+        ],
+        [
+          646,
+          1213,
+          795,
+          346
+        ],
+        [
+          859,
+          1271,
+          537,
+          333
+        ]
+      ],
+      "roc_auc_by_teacher": {
+        "flan_t5_base": 0.6103028888888888,
+        "flan_t5_small": 0.5348301111111111,
+        "gpt2": 0.4773827037037037,
+        "qwen15_18b": 0.5703527407407407
+      },
+      "roc_auc_ovr_macro": 0.5482171111111112,
+      "roc_auc_ovr_micro": 0.5489351759259259,
+      "roc_auc_ovr_weighted": 0.548217111111111,
+      "teacher_ids": [
+        "gpt2",
+        "qwen15_18b",
+        "flan_t5_base",
+        "flan_t5_small"
+      ],
+      "top2_accuracy": 0.5863333333333334
+    },
+    "ngram_1_4_classifier": {
+      "accuracy": 0.6216666666666667,
+      "accuracy_by_dataset": {
+        "alpaca": 0.493,
+        "cnn_dailymail": 0.5225,
+        "commonsenseqa": 0.683,
+        "openbookqa": 0.635,
+        "rotten_tomatoes": 0.757,
+        "sumpubmed": 0.6395
+      },
+      "accuracy_by_student_teacher_pair": {
+        "distilgpt2->gpt2": 0.49,
+        "lamini_flan_t5_248m->flan_t5_base": 0.6053333333333333,
+        "lamini_flan_t5_77m->flan_t5_small": 0.6773333333333333,
+        "miniplm_qwen_200m->qwen15_18b": 0.714
+      },
+      "accuracy_by_task": {
+        "instruction_following": 0.493,
+        "qa": 0.659,
+        "summarization": 0.6396666666666667
+      },
+      "breakdown_by_dataset": {
+        "alpaca": {
+          "accuracy": 0.493,
+          "confusion_matrix": [
+            [
+              124,
+              96,
+              34,
+              246
+            ],
+            [
+              80,
+              335,
+              30,
+              55
+            ],
+            [
+              17,
+              10,
+              256,
+              217
+            ],
+            [
+              21,
+              16,
+              192,
+              271
+            ]
+          ],
+          "num_rows": 2000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 512,
+            "flan_t5_small": 789,
+            "gpt2": 242,
+            "qwen15_18b": 457
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": 0.7521460000000001,
+            "flan_t5_small": 0.7335753333333334,
+            "gpt2": 0.71777,
+            "qwen15_18b": 0.8347606666666667
+          },
+          "roc_auc_ovr_macro": 0.7595630000000001,
+          "roc_auc_ovr_micro": 0.7708572499999999,
+          "roc_auc_ovr_weighted": 0.759563,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.7745,
+          "true_teacher_counts": {
+            "flan_t5_base": 500,
+            "flan_t5_small": 500,
+            "gpt2": 500,
+            "qwen15_18b": 500
+          }
+        },
+        "cnn_dailymail": {
+          "accuracy": 0.5225,
+          "confusion_matrix": [
+            [
+              202,
+              168,
+              51,
+              79
+            ],
+            [
+              123,
+              288,
+              28,
+              61
+            ],
+            [
+              16,
+              15,
+              293,
+              176
+            ],
+            [
+              20,
+              18,
+              200,
+              262
+            ]
+          ],
+          "num_rows": 2000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 572,
+            "flan_t5_small": 578,
+            "gpt2": 361,
+            "qwen15_18b": 489
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": 0.8116493333333333,
+            "flan_t5_small": 0.7819533333333334,
+            "gpt2": 0.7499046666666666,
+            "qwen15_18b": 0.8316926666666666
+          },
+          "roc_auc_ovr_macro": 0.7938000000000001,
+          "roc_auc_ovr_micro": 0.7969780416666666,
+          "roc_auc_ovr_weighted": 0.7938,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.837,
+          "true_teacher_counts": {
+            "flan_t5_base": 500,
+            "flan_t5_small": 500,
+            "gpt2": 500,
+            "qwen15_18b": 500
+          }
+        },
+        "commonsenseqa": {
+          "accuracy": 0.683,
+          "confusion_matrix": [
+            [
+              319,
+              63,
+              53,
+              65
+            ],
+            [
+              46,
+              402,
+              19,
+              33
+            ],
+            [
+              1,
+              1,
+              254,
+              244
+            ],
+            [
+              0,
+              0,
+              109,
+              391
+            ]
+          ],
+          "num_rows": 2000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 435,
+            "flan_t5_small": 733,
+            "gpt2": 366,
+            "qwen15_18b": 466
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": 0.8484966666666667,
+            "flan_t5_small": 0.8359019999999999,
+            "gpt2": 0.7615706666666666,
+            "qwen15_18b": 0.890796
+          },
+          "roc_auc_ovr_macro": 0.8341913333333333,
+          "roc_auc_ovr_micro": 0.8733430833333333,
+          "roc_auc_ovr_weighted": 0.8341913333333334,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.93,
+          "true_teacher_counts": {
+            "flan_t5_base": 500,
+            "flan_t5_small": 500,
+            "gpt2": 500,
+            "qwen15_18b": 500
+          }
+        },
+        "openbookqa": {
+          "accuracy": 0.635,
+          "confusion_matrix": [
+            [
+              239,
+              91,
+              82,
+              88
+            ],
+            [
+              32,
+              406,
+              28,
+              34
+            ],
+            [
+              2,
+              2,
+              264,
+              232
+            ],
+            [
+              3,
+              0,
+              136,
+              361
+            ]
+          ],
+          "num_rows": 2000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 510,
+            "flan_t5_small": 715,
+            "gpt2": 276,
+            "qwen15_18b": 499
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": 0.8362633333333334,
+            "flan_t5_small": 0.8258606666666667,
+            "gpt2": 0.6572439999999999,
+            "qwen15_18b": 0.8926860000000001
+          },
+          "roc_auc_ovr_macro": 0.8030135,
+          "roc_auc_ovr_micro": 0.8404289166666666,
+          "roc_auc_ovr_weighted": 0.8030135,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.9005,
+          "true_teacher_counts": {
+            "flan_t5_base": 500,
+            "flan_t5_small": 500,
+            "gpt2": 500,
+            "qwen15_18b": 500
+          }
+        },
+        "rotten_tomatoes": {
+          "accuracy": 0.757,
+          "confusion_matrix": [
+            [
+              333,
+              101,
+              38,
+              28
+            ],
+            [
+              58,
+              373,
+              11,
+              58
+            ],
+            [
+              3,
+              2,
+              402,
+              93
+            ],
+            [
+              7,
+              0,
+              87,
+              406
+            ]
+          ],
+          "num_rows": 2000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 538,
+            "flan_t5_small": 585,
+            "gpt2": 401,
+            "qwen15_18b": 476
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": 0.942678,
+            "flan_t5_small": 0.9513633333333334,
+            "gpt2": 0.8894133333333333,
+            "qwen15_18b": 0.9418146666666667
+          },
+          "roc_auc_ovr_macro": 0.9313173333333333,
+          "roc_auc_ovr_micro": 0.9333631250000001,
+          "roc_auc_ovr_weighted": 0.9313173333333334,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.9435,
+          "true_teacher_counts": {
+            "flan_t5_base": 500,
+            "flan_t5_small": 500,
+            "gpt2": 500,
+            "qwen15_18b": 500
+          }
+        },
+        "sumpubmed": {
+          "accuracy": 0.6395,
+          "confusion_matrix": [
+            [
+              253,
+              173,
+              38,
+              36
+            ],
+            [
+              99,
+              338,
+              31,
+              32
+            ],
+            [
+              9,
+              13,
+              347,
+              131
+            ],
+            [
+              11,
+              9,
+              139,
+              341
+            ]
+          ],
+          "num_rows": 2000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 555,
+            "flan_t5_small": 540,
+            "gpt2": 372,
+            "qwen15_18b": 533
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": 0.883692,
+            "flan_t5_small": 0.8874460000000001,
+            "gpt2": 0.8462413333333333,
+            "qwen15_18b": 0.8934933333333334
+          },
+          "roc_auc_ovr_macro": 0.8777181666666667,
+          "roc_auc_ovr_micro": 0.8758455416666666,
+          "roc_auc_ovr_weighted": 0.8777181666666667,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.903,
+          "true_teacher_counts": {
+            "flan_t5_base": 500,
+            "flan_t5_small": 500,
+            "gpt2": 500,
+            "qwen15_18b": 500
+          }
+        }
+      },
+      "breakdown_by_student_teacher_pair": {
+        "distilgpt2->gpt2": {
+          "accuracy": 0.49,
+          "confusion_matrix": [
+            [
+              1470,
+              692,
+              296,
+              542
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ]
+          ],
+          "num_rows": 3000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 296,
+            "flan_t5_small": 542,
+            "gpt2": 1470,
+            "qwen15_18b": 692
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": null,
+            "flan_t5_small": null,
+            "gpt2": null,
+            "qwen15_18b": null
+          },
+          "roc_auc_ovr_macro": NaN,
+          "roc_auc_ovr_micro": 0.7601379629629631,
+          "roc_auc_ovr_weighted": NaN,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.7283333333333334,
+          "true_teacher_counts": {
+            "flan_t5_base": 0,
+            "flan_t5_small": 0,
+            "gpt2": 3000,
+            "qwen15_18b": 0
+          }
+        },
+        "lamini_flan_t5_248m->flan_t5_base": {
+          "accuracy": 0.6053333333333333,
+          "confusion_matrix": [
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              48,
+              43,
+              1816,
+              1093
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ]
+          ],
+          "num_rows": 3000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 1816,
+            "flan_t5_small": 1093,
+            "gpt2": 48,
+            "qwen15_18b": 43
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": null,
+            "flan_t5_small": null,
+            "gpt2": null,
+            "qwen15_18b": null
+          },
+          "roc_auc_ovr_macro": NaN,
+          "roc_auc_ovr_micro": 0.8797843703703703,
+          "roc_auc_ovr_weighted": NaN,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.953,
+          "true_teacher_counts": {
+            "flan_t5_base": 3000,
+            "flan_t5_small": 0,
+            "gpt2": 0,
+            "qwen15_18b": 0
+          }
+        },
+        "lamini_flan_t5_77m->flan_t5_small": {
+          "accuracy": 0.6773333333333333,
+          "confusion_matrix": [
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              62,
+              43,
+              863,
+              2032
+            ]
+          ],
+          "num_rows": 3000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 863,
+            "flan_t5_small": 2032,
+            "gpt2": 62,
+            "qwen15_18b": 43
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": null,
+            "flan_t5_small": null,
+            "gpt2": null,
+            "qwen15_18b": null
+          },
+          "roc_auc_ovr_macro": NaN,
+          "roc_auc_ovr_micro": 0.8735036111111111,
+          "roc_auc_ovr_weighted": NaN,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.9526666666666667,
+          "true_teacher_counts": {
+            "flan_t5_base": 0,
+            "flan_t5_small": 3000,
+            "gpt2": 0,
+            "qwen15_18b": 0
+          }
+        },
+        "miniplm_qwen_200m->qwen15_18b": {
+          "accuracy": 0.714,
+          "confusion_matrix": [
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              438,
+              2142,
+              147,
+              273
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ]
+          ],
+          "num_rows": 3000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 147,
+            "flan_t5_small": 273,
+            "gpt2": 438,
+            "qwen15_18b": 2142
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": null,
+            "flan_t5_small": null,
+            "gpt2": null,
+            "qwen15_18b": null
+          },
+          "roc_auc_ovr_macro": NaN,
+          "roc_auc_ovr_micro": 0.915297462962963,
+          "roc_auc_ovr_weighted": NaN,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.8916666666666667,
+          "true_teacher_counts": {
+            "flan_t5_base": 0,
+            "flan_t5_small": 0,
+            "gpt2": 0,
+            "qwen15_18b": 3000
+          }
+        }
+      },
+      "breakdown_by_task": {
+        "instruction_following": {
+          "accuracy": 0.493,
+          "confusion_matrix": [
+            [
+              124,
+              96,
+              34,
+              246
+            ],
+            [
+              80,
+              335,
+              30,
+              55
+            ],
+            [
+              17,
+              10,
+              256,
+              217
+            ],
+            [
+              21,
+              16,
+              192,
+              271
+            ]
+          ],
+          "num_rows": 2000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 512,
+            "flan_t5_small": 789,
+            "gpt2": 242,
+            "qwen15_18b": 457
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": 0.7521460000000001,
+            "flan_t5_small": 0.7335753333333334,
+            "gpt2": 0.71777,
+            "qwen15_18b": 0.8347606666666667
+          },
+          "roc_auc_ovr_macro": 0.7595630000000001,
+          "roc_auc_ovr_micro": 0.7708572499999999,
+          "roc_auc_ovr_weighted": 0.759563,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.7745,
+          "true_teacher_counts": {
+            "flan_t5_base": 500,
+            "flan_t5_small": 500,
+            "gpt2": 500,
+            "qwen15_18b": 500
+          }
+        },
+        "qa": {
+          "accuracy": 0.659,
+          "confusion_matrix": [
+            [
+              558,
+              154,
+              135,
+              153
+            ],
+            [
+              78,
+              808,
+              47,
+              67
+            ],
+            [
+              3,
+              3,
+              518,
+              476
+            ],
+            [
+              3,
+              0,
+              245,
+              752
+            ]
+          ],
+          "num_rows": 4000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 945,
+            "flan_t5_small": 1448,
+            "gpt2": 642,
+            "qwen15_18b": 965
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": 0.8433090000000001,
+            "flan_t5_small": 0.8312625,
+            "gpt2": 0.7088388333333333,
+            "qwen15_18b": 0.891604
+          },
+          "roc_auc_ovr_macro": 0.8187535833333333,
+          "roc_auc_ovr_micro": 0.8569673125,
+          "roc_auc_ovr_weighted": 0.8187535833333334,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.91525,
+          "true_teacher_counts": {
+            "flan_t5_base": 1000,
+            "flan_t5_small": 1000,
+            "gpt2": 1000,
+            "qwen15_18b": 1000
+          }
+        },
+        "summarization": {
+          "accuracy": 0.6396666666666667,
+          "confusion_matrix": [
+            [
+              788,
+              442,
+              127,
+              143
+            ],
+            [
+              280,
+              999,
+              70,
+              151
+            ],
+            [
+              28,
+              30,
+              1042,
+              400
+            ],
+            [
+              38,
+              27,
+              426,
+              1009
+            ]
+          ],
+          "num_rows": 6000,
+          "predicted_teacher_counts": {
+            "flan_t5_base": 1665,
+            "flan_t5_small": 1703,
+            "gpt2": 1134,
+            "qwen15_18b": 1498
+          },
+          "roc_auc_by_teacher": {
+            "flan_t5_base": 0.8840302962962963,
+            "flan_t5_small": 0.8813434814814813,
+            "gpt2": 0.8327931111111111,
+            "qwen15_18b": 0.8934837777777778
+          },
+          "roc_auc_ovr_macro": 0.8729126666666667,
+          "roc_auc_ovr_micro": 0.8740873333333334,
+          "roc_auc_ovr_weighted": 0.8729126666666666,
+          "teacher_ids": [
+            "gpt2",
+            "qwen15_18b",
+            "flan_t5_base",
+            "flan_t5_small"
+          ],
+          "top2_accuracy": 0.8945,
+          "true_teacher_counts": {
+            "flan_t5_base": 1500,
+            "flan_t5_small": 1500,
+            "gpt2": 1500,
+            "qwen15_18b": 1500
+          }
+        }
+      },
+      "confusion_matrix": [
+        [
+          1470,
+          692,
+          296,
+          542
+        ],
+        [
+          438,
+          2142,
+          147,
+          273
+        ],
+        [
+          48,
+          43,
+          1816,
+          1093
+        ],
+        [
+          62,
+          43,
+          863,
+          2032
+        ]
+      ],
+      "roc_auc_by_teacher": {
+        "flan_t5_base": 0.8539103888888889,
+        "flan_t5_small": 0.8473484814814815,
+        "gpt2": 0.7701966851851852,
+        "qwen15_18b": 0.8842427407407407
+      },
+      "roc_auc_ovr_macro": 0.8389245740740742,
+      "roc_auc_ovr_micro": 0.8495273368055555,
+      "roc_auc_ovr_weighted": 0.8389245740740741,
+      "teacher_ids": [
+        "gpt2",
+        "qwen15_18b",
+        "flan_t5_base",
+        "flan_t5_small"
+      ],
+      "top2_accuracy": 0.8814166666666666
+    }
+  },
+  "num_test_rows": 12000,
+  "teacher_ids": [
+    "gpt2",
+    "qwen15_18b",
+    "flan_t5_base",
+    "flan_t5_small"
+  ]
+}

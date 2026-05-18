@@ -1,36 +1,32 @@
-# ACL Report Draft
+# ACL Report
 
-This folder contains the first ACL-style draft of the final project report.
+This folder contains the ACL-style final project report source, bibliography,
+style files, figures, and compiled PDF.
 
 Files:
 
 - `teacher_attribution_acl_draft.tex`: main report source.
+- `teacher_attribution_acl_draft.pdf`: compiled report PDF.
 - `references.bib`: bibliography.
+- `figures/00_latent_space_hero.png`: first-page latent-space visualization.
 - `figures/01_training_loss_accuracy.png`: training loss and validation-accuracy curve.
-- `figures/11_single_vs_set_level_comparison.png`: single-prompt versus set-level evaluation plot.
+- `figures/13_confusion_progression.png`: set-level confusion-matrix progression.
 
-To compile with the official ACL style files:
+The ACL style files used for compilation are included:
 
-1. Download the ACL style files from <https://github.com/acl-org/acl-style-files>.
-2. Copy at least these files into this folder:
-   - `acl.sty`
-   - `acl_natbib.bst`
-3. Compile:
+```text
+acl.sty
+acl_natbib.bst
+```
+
+Compile with:
 
 ```bash
-pdflatex teacher_attribution_acl_draft
-bibtex teacher_attribution_acl_draft
-pdflatex teacher_attribution_acl_draft
-pdflatex teacher_attribution_acl_draft
+latexmk -pdf teacher_attribution_acl_draft.tex
 ```
 
 If a minimal TinyTeX install is missing ACL dependencies, install the missing LaTeX packages first, for example:
 
 ```bash
-tlmgr install caption lineno
+tlmgr install caption microtype upquote
 ```
-
-Before final submission:
-
-- Add one confusion matrix figure or move it to an appendix.
-- Check that the main body is at most 4 ACL pages. The assignment says limitations and references are outside the page count.

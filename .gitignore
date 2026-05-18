@@ -15,6 +15,15 @@ logs/
 wandb/
 *.log
 
+# LaTeX build artifacts
+report/*.aux
+report/*.bbl
+report/*.blg
+report/*.fdb_latexmk
+report/*.fls
+report/*.out
+report/*.synctex.gz
+
 # Hugging Face and model caches
 hf_cache/
 .cache/
@@ -38,3 +47,10 @@ Thumbs.db
 
 # Downloaded source datasets
 external_datasets/
+
+# Local scratch copies of downloaded metric summaries.
+/ablation_eval_summary.csv
+/ablation_summary.csv
+/encoder_training_metrics.json
+/epoch_progression.csv
+/public_lineage_encoder_metrics.json

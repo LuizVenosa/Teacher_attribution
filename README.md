@@ -42,18 +42,29 @@ evidence notes and recommended subset order before running the heavier models.
 
 There is no `make_sft_data.py`, no LoRA student training, and no generated student checkpoints.
 
-## Current Experiment Status
+## Final Reported Experiment
 
-Status as of 2026-05-16:
+The final report uses the clean four-way public-lineage setup and the compact
+MiniLM encoder, `sentence-transformers/all-MiniLM-L6-v2`.  The cluster run
+generated teacher and student outputs for the four default pairs, built 12,000
+test attribution rows (3,000 prompts x 4 teacher labels), and trained the
+contrastive encoder on 29,742 training prompts per teacher/student lineage.
 
-- The clean 4-way public-lineage setup is generated and usable on the cluster.
-- Teacher and student outputs were generated for the four default pairs.
-- Test attribution pairs were built with 12,000 rows: 3,000 prompts x 4 student-teacher labels.
-- Full train generation completed with 29,742 prompts per teacher/student model, and train/validation attribution pairs were built for contrastive training.
-- The main completed encoder result is the MiniLM contrastive run using `sentence-transformers/all-MiniLM-L6-v2`.
-- The current default config is set to the larger `intfloat/e5-large-v2` encoder for follow-up experiments.
+The default configs in this repository now point to the final reported MiniLM
+setup:
 
-Completed MiniLM contrastive result:
+```text
+configs/public_lineage_models.yaml
+configs/public_lineage_attribution.yaml
+```
+
+The smaller tracked prompt files in `data/prompts/` are included as lightweight
+examples and smoke-test inputs.  The full final prompt bank is regenerated from
+the public/local WTYT-style datasets with the command in
+[Build Prompts](#build-prompts), because the generated teacher/student outputs
+and attribution-pair JSONL files are larger derived artifacts.
+
+Final MiniLM contrastive result:
 
 | Split / setting | Accuracy | Top-2 accuracy | Macro ROC-AUC | Notes |
 |---|---:|---:|---:|---|
@@ -85,21 +96,29 @@ MiniLM ablation summary:
 
 The ablations are useful for analysis, but none surpassed the full MiniLM run trained with early stopping.
 
-Current E5-large status:
+Small final-result files are included with the repository despite the broad
+`results/**` ignore rule:
 
-- `intfloat/e5-large-v2` is cached and configured as the default encoder.
-- The E5 run improved through epoch 3, reaching validation accuracy around 0.5517.
-- Epoch 4 collapsed to chance accuracy, suggesting an unstable learning rate or over-updating during full fine-tuning.
-- The next E5 attempt should use a smaller learning rate, such as `1e-5` or `5e-6`, and evaluate the best checkpoint before continuing long runs.
+```text
+results/baselines/public_lineage_test_metrics.json
+results/contrastive/public_lineage_minilm_probe_metrics_no_sentence.json
+results/contrastive_ablation/ablation_summary.csv
+results/contrastive_ablation/eval_summary.csv
+results/contrastive_ablation/epoch_progression.csv
+report/figures/
+```
 
-Remaining project work:
+Large generated files are intentionally not committed:
 
-- Evaluate the best E5-large checkpoint if it has not already been evaluated.
-- Run a stabilized E5-large configuration with lower learning rate, or report E5-large as an ongoing scaling experiment.
-- Export plots from `results/contrastive_ablation/epoch_progression.csv` for validation accuracy and loss curves.
-- Add final tables for baseline results, MiniLM contrastive results, ablations, task/dataset breakdowns, and confusion matrices.
-- Decide whether to keep the paper at the 4-way public-lineage setup or add Llama/SmolLM candidates as future work.
-- Write the paper around the completed MiniLM result; E5-large can be either a final extra result or future work.
+```text
+data/public_lineage/*_outputs/
+data/attribution/*_pairs.jsonl
+models/attribution_encoder/*/*.pt
+external_datasets/
+```
+
+Larger encoders, more model pairs, and harder cross-dataset/paraphrased-prompt
+settings are left as future work rather than part of the final reported result.
 
 ## Setup
 
@@ -154,17 +173,17 @@ sbatch jobs/04_build_public_lineage_attribution.sbatch
 # 3. Run baselines.
 sbatch jobs/06_eval_public_lineage.sbatch baselines
 
-# 4a. Train the current default contrastive encoder. The default config is E5-large,
-# so use a long allocation.
-sbatch --time=24:00:00 jobs/05_train_public_lineage_contrastive.sbatch
-
-# 4b. Reproduce the MiniLM main run if the MiniLM configs are available on the cluster.
-MODELS_CONFIG=configs/public_lineage_models_minilm.yaml \
-ATTRIBUTION_CONFIG=configs/public_lineage_attribution_minilm_ablate.yaml \
+# 4. Train the final reported MiniLM contrastive encoder.
 sbatch --time=08:00:00 jobs/05_train_public_lineage_contrastive.sbatch
 
 # 5. Evaluate set-level attribution.
 sbatch jobs/06_eval_public_lineage.sbatch encoder
+
+# 6. Evaluate frozen contrastive probes used in the final report.
+SKIP_SENTENCE_BASELINE=1 sbatch jobs/08_eval_contrastive_probes.sbatch
+
+# 7. Regenerate report figures.
+sbatch jobs/09_plot_latent_space_hero.sbatch
 ```
 
 To run the expanded candidate pool instead of the default four-pair setup:

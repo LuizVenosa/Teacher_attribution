@@ -1,0 +1,8 @@
+best_accuracy,best_epoch,best_score,classification_weight,early_stopped,learning_rate,max_length,name,output_dir,projection_dim,stopped_epoch,temperature
+0.6010833333333333,5,0.6010833333333333,0.2,False,2e-05,512,proj256,models/attribution_encoder/public_lineage_ablations/proj256,256,5,0.05
+0.5993333333333334,4,0.5993333333333334,0.2,False,2e-05,,temp007,models/attribution_encoder/public_lineage_ablations/temp007,,5,0.07
+0.5989166666666667,4,0.5989166666666667,0.2,False,5e-05,,lr5e5,models/attribution_encoder/public_lineage_ablations/lr5e5,,5,0.05
+0.5985833333333334,4,0.5985833333333334,0.2,False,2e-05,,temp003,models/attribution_encoder/public_lineage_ablations/temp003,,5,0.03
+0.598,4,0.598,0.1,False,2e-05,,cls010,models/attribution_encoder/public_lineage_ablations/cls010,,5,0.05
+0.5976666666666667,4,0.5976666666666667,0.5,False,2e-05,,cls050,models/attribution_encoder/public_lineage_ablations/cls050,,5,0.05
+0.597,4,0.597,0.2,False,2e-05,,baseline_temp005_cls02_lr2e5,models/attribution_encoder/public_lineage_ablations/baseline_temp005_cls02_lr2e5,,5,0.05

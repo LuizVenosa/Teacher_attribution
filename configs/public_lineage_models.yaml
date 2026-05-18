@@ -35,7 +35,7 @@ public_students:
     evidence: "LaMini-Flan-T5-77M is the 77M Flan-T5-family instruction-distilled checkpoint."
 
 attribution_encoder:
-  hf_name: intfloat/e5-large-v2
+  hf_name: sentence-transformers/all-MiniLM-L6-v2
 
 teacher_labels:
   gpt2: 0

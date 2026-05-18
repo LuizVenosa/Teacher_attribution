@@ -1,0 +1,8 @@
+run,accuracy,top2_accuracy,roc_auc_macro,roc_auc_micro,encoder_model,checkpoint
+baseline_temp005_cls02_lr2e5,0.59875,0.8285833333333333,0.676948462962963,0.6715615648148148,sentence-transformers/all-MiniLM-L6-v2,models/attribution_encoder/public_lineage_ablations/baseline_temp005_cls02_lr2e5/best.pt
+cls010,0.5993333333333334,0.8295,0.675469550925926,0.6697095381944445,sentence-transformers/all-MiniLM-L6-v2,models/attribution_encoder/public_lineage_ablations/cls010/best.pt
+cls050,0.5955,0.8295,0.6774755231481482,0.673736869212963,sentence-transformers/all-MiniLM-L6-v2,models/attribution_encoder/public_lineage_ablations/cls050/best.pt
+lr5e5,0.6008333333333333,0.8285833333333333,0.6778679675925926,0.672360224537037,sentence-transformers/all-MiniLM-L6-v2,models/attribution_encoder/public_lineage_ablations/lr5e5/best.pt
+proj256,0.59675,0.8289166666666666,0.6768314259259258,0.6718177569444445,sentence-transformers/all-MiniLM-L6-v2,models/attribution_encoder/public_lineage_ablations/proj256/best.pt
+temp003,0.6003333333333334,0.8285833333333333,0.6634986898148149,0.6575497800925925,sentence-transformers/all-MiniLM-L6-v2,models/attribution_encoder/public_lineage_ablations/temp003/best.pt
+temp007,0.5975833333333334,0.8296666666666667,0.6842582638888889,0.6798756909722221,sentence-transformers/all-MiniLM-L6-v2,models/attribution_encoder/public_lineage_ablations/temp007/best.pt
