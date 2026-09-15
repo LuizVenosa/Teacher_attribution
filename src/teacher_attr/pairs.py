@@ -31,6 +31,8 @@ def align(
                     raise ValueError(f"{name}/{pid}: prompt or split mismatch")
                 if not row["response"].strip():
                     raise ValueError(f"{name}/{pid}: empty response; investigate generation")
+                if row.get("quality_flags"):
+                    raise ValueError(f"{name}/{pid}: flagged response; inspect generation QC")
                 if row.get("model_id") != name:
                     raise ValueError(f"{name}/{pid}: wrong model ID")
             maps[role, name] = mapping

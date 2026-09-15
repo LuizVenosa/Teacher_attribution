@@ -11,3 +11,5 @@ To compile the historical draft, if needed:
 ```bash
 latexmk -pdf teacher_attribution_acl_draft.tex
 ```
+
+The controlled distillation experiment introduced in package version 0.3 is documented in `../docs/implementation.md`. It has its own prompt pools, students and results; this historical report does not describe its outcomes.

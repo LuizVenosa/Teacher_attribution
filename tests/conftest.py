@@ -72,7 +72,7 @@ def tiny_models(tmp_path, config):
     encoder_dir.mkdir()
     vocab_path = encoder_dir / "vocab.txt"
     vocab_path.write_text("\n".join(vocabulary), encoding="utf-8")
-    tokenizer = BertTokenizer(vocab_file=str(vocab_path))
+    tokenizer = BertTokenizer(vocab=str(vocab_path))
     tokenizer.save_pretrained(encoder_dir)
     BertModel(
         BertConfig(

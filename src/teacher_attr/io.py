@@ -53,3 +53,9 @@ def save_json(path: str | Path, obj: Any) -> None:
     with path.open("w", encoding="utf-8") as f:
         json.dump(obj, f, indent=2, ensure_ascii=False, sort_keys=True)
         f.write("\n")
+
+
+def save_yaml(path: str | Path, obj: Any) -> None:
+    import yaml
+
+    ensure_parent(path).write_text(yaml.safe_dump(obj, sort_keys=False), encoding="utf-8")

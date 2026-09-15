@@ -25,6 +25,10 @@ def file_hash(path: str | Path) -> str:
 def load_config(path: str | Path) -> dict:
     path = Path(path).resolve()
     cfg = load_yaml(path)
+    if "research" in cfg:
+        from teacher_attr.research import expand_config
+
+        cfg = expand_config(cfg, path.parent)
     validate_config(cfg)
     cfg["run_dir"] = str((path.parent / cfg["run_dir"]).resolve())
     if cfg["data"].get("local_dir"):
@@ -46,7 +50,11 @@ def validate_config(cfg: dict) -> None:
     ):
         if key not in cfg:
             raise ValueError(f"Missing config key: {key}")
-    if cfg["protocol"] not in {"public_seen_students", "held_out_students"}:
+    if cfg["protocol"] not in {
+        "public_seen_students",
+        "held_out_students",
+        "controlled_seen_students",
+    }:
         raise ValueError("protocol must be public_seen_students or held_out_students")
     if len(cfg["teachers"]) < 2:
         raise ValueError("At least two candidate teachers are required")

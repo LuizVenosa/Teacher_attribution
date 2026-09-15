@@ -1,2 +1,1 @@
-# Optional compatibility entry point; pyproject.toml is the dependency source.
--e .[models,data]
+-e .[models,data,research]

@@ -1,3 +1,7 @@
+# Previous public-pilot simplification
+
+This records the earlier refactor. The later controlled implementation restores components explicitly required by the new research specification; see [implementation.md](implementation.md).
+
 # Refactor decisions
 
 The active pipeline now has one config and one CLI. This is a breaking change: old checkpoints, prompt splits, generated outputs, and script commands are not compatible. New artifacts use schema version 2 and a separate `runs/` directory.

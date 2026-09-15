@@ -159,6 +159,10 @@ def audit_splits(splits: dict[str, list[dict]]) -> dict:
 
 
 def prepare(cfg: dict) -> dict:
+    if "research" in cfg:
+        from teacher_attr.research import prepare_research
+
+        return prepare_research(cfg)
     root = initialize_run(cfg)
     manifest_path = root / "prompts" / "manifest.json"
     if manifest_path.exists():

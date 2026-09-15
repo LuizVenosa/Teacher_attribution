@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.metadata
 import warnings
+from pathlib import Path
 
 import numpy as np
 from sklearn.exceptions import ConvergenceWarning
@@ -9,7 +10,7 @@ from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 
-from teacher_attr.config import file_hash, initialize_run
+from teacher_attr.config import file_hash, initialize_run, load_config
 from teacher_attr.io import save_json, write_jsonl
 from teacher_attr.metrics import (
     aggregate_scores,
@@ -89,7 +90,7 @@ def encode_rows(
 
     from teacher_attr.encoders import score_embeddings, to_device, tokenize_pairs
 
-    embeddings, logits, cosine, audits = [], [], [], []
+    embeddings, logits, cosine, audits, teacher_embeddings = [], [], [], [], []
     model.eval()
     with torch.inference_mode():
         for start in range(0, len(rows), enc["batch_size"]):
@@ -108,6 +109,7 @@ def encode_rows(
                 teacher_emb, _ = model(projected=projected, **to_device(teacher_tokens, device))
                 teacher_emb = teacher_emb.reshape(len(batch), len(teachers), -1)
                 cosine.append(score_embeddings(emb, teacher_emb).cpu().numpy())
+                teacher_embeddings.append(teacher_emb.cpu().numpy())
             embeddings.append(emb.cpu().numpy())
             if cls is not None:
                 logits.append(cls.cpu().numpy())
@@ -125,6 +127,7 @@ def encode_rows(
             )
     return {
         "embeddings": np.concatenate(embeddings),
+        "teacher_embeddings": np.concatenate(teacher_embeddings) if teacher_embeddings else None,
         "cosine": np.concatenate(cosine) if cosine else None,
         "logits": np.concatenate(logits) if logits else None,
         "audit": audits,
@@ -132,7 +135,11 @@ def encode_rows(
 
 
 def evaluate(
-    cfg: dict, checkpoint: str | None = None, frozen: bool = False, name: str = "evaluation"
+    cfg: dict,
+    checkpoint: str | None = None,
+    frozen: bool = False,
+    name: str = "evaluation",
+    reference_config: str | None = None,
 ) -> dict:
     if not name or any(c not in "abcdefghijklmnopqrstuvwxyz0123456789_-" for c in name):
         raise ValueError("Evaluation name must be a safe lowercase identifier")
@@ -140,13 +147,61 @@ def evaluate(
     out = root / "evaluations" / name
     if out.exists():
         raise ValueError(f"Evaluation already exists: {out}; choose a new --name")
+    out.mkdir(parents=True, exist_ok=True)
     splits = load_pairs(cfg)
+    checkpoint_cfg = load_config(reference_config) if reference_config else cfg
+    if reference_config:
+        from teacher_attr.prompts import audit_splits
+
+        if list(checkpoint_cfg["teachers"]) != list(cfg["teachers"]):
+            raise ValueError("Transfer evaluation requires identical candidate teacher order")
+        reference = load_pairs(checkpoint_cfg)
+        splits = {"train": reference["train"], "val": reference["val"], "test": splits["test"]}
+        audit_splits(splits)
     teachers = list(cfg["teachers"])
     labels = {
         s: np.array([teachers.index(r["true_teacher"]) for r in rows]) for s, rows in splits.items()
     }
     ev = cfg["evaluation"]
     methods, selection = lexical_scores(splits, labels, ev["logreg_c"])
+    from teacher_attr.baselines import matching_tfidf
+
+    methods["tfidf_matching"] = matching_tfidf(splits, teachers)
+    if ev.get("pos_model"):
+        from teacher_attr.baselines import pos_scores
+
+        methods["pos"], selection["pos"] = pos_scores(
+            splits, labels, ev["pos_model"], ev["logreg_c"]
+        )
+    if "research" in cfg:
+        from teacher_attr.baselines import shortcut_scores
+
+        shortcuts, chosen = shortcut_scores(splits, labels, cfg)
+        methods.update(shortcuts)
+        selection.update(chosen)
+        if ev.get("perplexity_control"):
+            from teacher_attr.baselines import perplexity_scores
+
+            methods["perplexity"], selection["perplexity"] = perplexity_scores(splits, labels, cfg)
+    if ev.get("generic_encoder"):
+        import torch
+        from transformers import AutoTokenizer
+
+        from teacher_attr.encoders import AttributionEncoder
+
+        generic = {**cfg["encoder"], **ev["generic_encoder"], "input_mode": "response"}
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        model = AttributionEncoder.pretrained(generic, len(teachers)).to(device)
+        tokenizer = AutoTokenizer.from_pretrained(generic["hf_name"], revision=generic["revision"])
+        encoded = encode_rows(model, tokenizer, splits["test"], generic, teachers, device, False)
+        methods["generic_cosine"] = encoded["cosine"]
+        np.savez_compressed(
+            out / "generic_embeddings.npz",
+            student=encoded["embeddings"],
+            teachers=encoded["teacher_embeddings"],
+        )
+        del model, encoded
+
     encoder_info = {}
     audits = {}
     if frozen or checkpoint:
@@ -163,7 +218,7 @@ def evaluate(
         for variant in variants:
             payload = None
             if variant == "trained":
-                model, tokenizer, payload = load_checkpoint(checkpoint, cfg, device)
+                model, tokenizer, payload = load_checkpoint(checkpoint, checkpoint_cfg, device)
                 enc = payload["encoder"]
             else:
                 model = AttributionEncoder.pretrained(enc, len(teachers)).to(device)
@@ -199,6 +254,11 @@ def evaluate(
             }
             if payload and payload["resolved_revision"]:
                 enc = {**enc, "revision": payload["resolved_revision"]}
+            np.savez_compressed(
+                out / f"{variant}_embeddings.npz",
+                student=encoded["test"]["embeddings"],
+                teachers=encoded["test"]["teacher_embeddings"],
+            )
             del model, encoded
     rows, y = splits["test"], labels["test"]
     prompts = [r["prompt_id"] for r in rows]
@@ -240,11 +300,18 @@ def evaluate(
         "schema_version": 2,
         "teacher_ids": teachers,
         "protocol": cfg["protocol"],
+        "reference_config": reference_config,
+        "probe_training_run": checkpoint_cfg["run_dir"],
         "num_test_prompts": len(set(prompts)),
         "methods": results,
         "validation_selection": selection,
         "encoders": encoder_info,
-        "pair_sha256": {s: file_hash(root / "pairs" / f"{s}.jsonl") for s in splits},
+        "pair_sha256": {
+            s: file_hash(
+                (Path(checkpoint_cfg["run_dir"]) if s != "test" else root) / "pairs" / f"{s}.jsonl"
+            )
+            for s in splits
+        },
         "aggregation": "arithmetic mean of per-prompt method scores",
         "interval_scope": "prompt bootstrap conditional on observed student checkpoints",
         "environment": {
@@ -252,6 +319,10 @@ def evaluate(
             for p in ("numpy", "scikit-learn", "teacher-attribution")
         },
     }
+    if "research" in cfg:
+        from teacher_attr.research import provenance
+
+        metadata["environment"] = provenance()
     save_json(out / "metrics.json", metadata)
     write_jsonl(
         out / "predictions.jsonl",
@@ -259,6 +330,7 @@ def evaluate(
             {
                 "row_index": i,
                 "prompt_id": r["prompt_id"],
+                "original_prompt_id": r.get("original_prompt_id"),
                 "student_id": r["student_id"],
                 "source_dataset": r["source_dataset"],
                 "true_teacher": r["true_teacher"],

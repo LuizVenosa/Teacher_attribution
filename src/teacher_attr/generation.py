@@ -13,10 +13,13 @@ def output_path(root: Path, role: str, model_id: str, split: str) -> Path:
     return root / "outputs" / role / model_id / f"{split}.jsonl"
 
 
-def render_prompt(tokenizer, prompt: str, mode: str) -> str:
+def render_prompt(tokenizer, prompt: str, mode: str, chat_kwargs: dict | None = None) -> str:
     if mode == "chat":
         return tokenizer.apply_chat_template(
-            [{"role": "user", "content": prompt}], tokenize=False, add_generation_prompt=True
+            [{"role": "user", "content": prompt}],
+            tokenize=False,
+            add_generation_prompt=True,
+            **(chat_kwargs or {}),
         )
     return prompt
 
@@ -61,6 +64,10 @@ def generate(cfg: dict, role: str, model_id: str, split: str) -> dict:
     root = initialize_run(cfg)
     verify_prompts(root)
     model_cfg = cfg[role][model_id]
+    if role == "students" and "research" in cfg:
+        from teacher_attr.distillation import verify_student
+
+        verify_student(cfg, model_id)
     if role == "students" and split not in model_cfg["splits"]:
         raise ValueError(f"{model_id} is not assigned to {split}")
     prompts = load_jsonl(root / "prompts" / f"{split}.jsonl")
@@ -85,16 +92,40 @@ def generate(cfg: dict, role: str, model_id: str, split: str) -> dict:
     if tokenizer.pad_token_id is None:
         raise ValueError("Tokenizer must have a pad or EOS token")
     gen = cfg["generation"]
-    rendered = [render_prompt(tokenizer, p["prompt"], model_cfg["prompt_format"]) for p in prompts]
-    limits = [getattr(config, k, None) for k in ("max_position_embeddings", "n_positions")]
+
+    def prepared_prompt(row):
+        text = row["prompt"]
+        if gen.get("system_instruction"):
+            text = gen["system_instruction"] + "\n\n" + text
+        if gen.get("controlled_length"):
+            text += "\n\n" + gen["task_instructions"][row["task"]]
+        if role == "students" and "research" in cfg:
+            from teacher_attr.distillation import student_prompt
+
+            return student_prompt(text)
+        return render_prompt(
+            tokenizer, text, model_cfg["prompt_format"], model_cfg.get("chat_kwargs")
+        )
+
+    rendered = [prepared_prompt(p) for p in prompts]
+    text_config = getattr(config, "text_config", config)
+    limits = [getattr(text_config, k, None) for k in ("max_position_embeddings", "n_positions")]
     limits += [tokenizer.model_max_length]
     context = min((n for n in limits if isinstance(n, int) and 0 < n < 100000), default=2048)
     budget = min(
         gen["max_input_tokens"],
-        context - (0 if config.is_encoder_decoder else gen["max_new_tokens"]),
+        context
+        - (
+            0
+            if config.is_encoder_decoder
+            else max([gen["max_new_tokens"], *gen.get("task_max_new_tokens", {}).values()])
+        ),
     )
     # Fail rather than silently give different teachers different article prefixes.
-    lengths = [len(tokenizer.encode(p, add_special_tokens=True)) for p in rendered]
+    add_special_tokens = model_cfg["prompt_format"] != "chat" and not (
+        role == "students" and "research" in cfg
+    )
+    lengths = [len(tokenizer.encode(p, add_special_tokens=add_special_tokens)) for p in rendered]
     if max(lengths) > budget:
         raise ValueError(
             f"{model_id}: prompt needs {max(lengths)} tokens, budget is {budget}. "
@@ -105,7 +136,14 @@ def generate(cfg: dict, role: str, model_id: str, split: str) -> dict:
     if device == "cpu" and dtype == torch.float16:
         raise ValueError("Use float32 for CPU generation")
     cls = AutoModelForSeq2SeqLM if config.is_encoder_decoder else AutoModelForCausalLM
-    model = cls.from_pretrained(model_cfg["hf_name"], torch_dtype=dtype, **kwargs).to(device)
+    if model_cfg.get("model_class"):
+        import transformers
+
+        cls = getattr(transformers, model_cfg["model_class"])
+    load_kwargs = dict(kwargs)
+    if gen.get("attention"):
+        load_kwargs["attn_implementation"] = gen["attention"]
+    model = cls.from_pretrained(model_cfg["hf_name"], torch_dtype=dtype, **load_kwargs).to(device)
     model.eval()
     metadata = {
         "spec": generation_spec(cfg, role, model_id, split),
@@ -119,42 +157,107 @@ def generate(cfg: dict, role: str, model_id: str, split: str) -> dict:
         if Path(model_cfg["hf_name"]).is_dir()
         else None,
     }
+    if "research" in cfg:
+        from teacher_attr.research import provenance
+
+        metadata["runtime"] = provenance()
     if meta_path.exists():
         if json.loads(meta_path.read_text(encoding="utf-8")) != metadata:
             raise ValueError("Resolved model revision changed; use a pinned revision and new run")
     else:
         save_json(meta_path, metadata)
-    sampling = {"do_sample": gen["temperature"] > 0}
-    if sampling["do_sample"]:
-        sampling.update(temperature=gen["temperature"], top_p=gen["top_p"])
-    for row, text in zip(prompts, rendered, strict=True):
-        if row["prompt_id"] in done:
-            continue
-        seed = int(fingerprint([cfg["seed"], role, model_id, row["prompt_id"]])[:8], 16)
-        set_seed(seed)
-        tokens = tokenizer(text, return_tensors="pt").to(device)
-        with torch.inference_mode():
-            output = model.generate(
-                **tokens,
-                max_new_tokens=gen["max_new_tokens"],
-                pad_token_id=tokenizer.pad_token_id,
-                **sampling,
-            )[0]
-        if not config.is_encoder_decoder:
-            output = output[tokens["input_ids"].shape[1] :]
-        response = tokenizer.decode(output, skip_special_tokens=True).strip()
-        append_jsonl(
-            path,
-            [
-                {
-                    **row,
-                    "model_id": model_id,
-                    "response": response,
-                    "input_tokens": tokens["input_ids"].shape[1],
-                    "output_tokens": len(output),
-                    "generation_seed": seed,
-                    "generation_fingerprint": fingerprint(metadata),
-                }
-            ],
+    temperature = (
+        gen.get("student_temperature", gen["temperature"])
+        if role == "students"
+        else gen["temperature"]
+    )
+    sampling = {"do_sample": temperature > 0}
+    if "research" in cfg:
+        sampling.update(
+            top_k=gen["top_k"],
+            repetition_penalty=gen["repetition_penalty"],
+            min_p=None,
+            typical_p=1.0,
+            epsilon_cutoff=0.0,
+            eta_cutoff=0.0,
         )
+    if sampling["do_sample"]:
+        sampling.update(temperature=temperature, top_p=gen["top_p"])
+    # Stable batches: interrupted batches are regenerated in full with the same seed.
+    # Rows already committed are skipped only at write time, preserving random draws.
+    tokenizer.padding_side = "left"
+    from teacher_attr.quality import clean_response
+
+    batch_size = gen.get("batch_size", 1)
+    groups = {}
+    for row, text in zip(prompts, rendered, strict=True):
+        limit = gen.get("task_max_new_tokens", {}).get(row["task"], gen["max_new_tokens"])
+        groups.setdefault(limit, []).append((row, text))
+    for limit, items in groups.items():
+        for start in range(0, len(items), batch_size):
+            batch = items[start : start + batch_size]
+            if all(r["prompt_id"] in done for r, _ in batch):
+                continue
+            seed = int(
+                fingerprint([cfg["seed"], role, model_id, [r["prompt_id"] for r, _ in batch]])[:8],
+                16,
+            )
+            set_seed(seed)
+            tokens = tokenizer(
+                [t for _, t in batch],
+                padding=True,
+                return_tensors="pt",
+                add_special_tokens=add_special_tokens,
+            ).to(device)
+            with torch.inference_mode():
+                outputs = model.generate(
+                    **tokens, max_new_tokens=limit, pad_token_id=tokenizer.pad_token_id, **sampling
+                )
+            new_rows = []
+            for i, (row, rendered_prefix) in enumerate(batch):
+                if row["prompt_id"] in done:
+                    continue
+                output = outputs[i]
+                if not config.is_encoder_decoder:
+                    output = output[tokens["input_ids"].shape[1] :]
+                ids = output.tolist()
+                eos = model.generation_config.eos_token_id
+                eos_ids = eos if isinstance(eos, list) else [eos] if eos is not None else []
+                stop = next((j for j, token in enumerate(ids) if token in eos_ids), len(ids))
+                used = ids[:stop]
+                text = tokenizer.decode(used, skip_special_tokens=False).strip()
+                parser_flags = []
+                if model_cfg["prompt_format"] == "chat" and getattr(
+                    tokenizer, "response_template", None
+                ):
+                    parsed = tokenizer.parse_response(text, prefix=rendered_prefix)
+                    content = parsed.get("content", "")
+                    if isinstance(content, list):
+                        content = "\n".join(
+                            c.get("text", "") for c in content if c.get("type") == "text"
+                        )
+                    text = content or ""
+                    if (
+                        parsed.get("reasoning_content")
+                        or parsed.get("thinking")
+                        or parsed.get("reasoning")
+                    ):
+                        parser_flags.append("reasoning_removed")
+                response, flags = clean_response(text, gen.get("identity_patterns", []))
+                flags += parser_flags
+                new_rows.append(
+                    {
+                        **row,
+                        "model_id": model_id,
+                        "response": response,
+                        "input_tokens": int(tokens["attention_mask"][i].sum()),
+                        "output_tokens": len(used),
+                        "truncated": stop == len(ids) and len(ids) >= limit,
+                        "quality_flags": flags,
+                        "generation_seed": seed,
+                        "generation_config": {**gen, "actual_max_new_tokens": limit},
+                        "generation_fingerprint": fingerprint(metadata),
+                    }
+                )
+            append_jsonl(path, new_rows)
     return {"model": model_id, "split": split, "rows": len(prompts)}

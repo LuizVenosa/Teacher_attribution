@@ -9,9 +9,13 @@ from transformers import AutoModel
 def tokenize_pairs(tokenizer, pairs: list[tuple[str, str]], cfg: dict):
     """Cap the prompt separately so a long document cannot erase the response."""
     features, audit = [], []
+    backend = tokenizer.backend_tokenizer
+    backend.no_truncation()
+    backend.no_padding()
     for prompt, response in pairs:
-        p = tokenizer.encode(prompt, add_special_tokens=False)
-        r = tokenizer.encode(response, add_special_tokens=False)
+        p_encoding = backend.encode(prompt, add_special_tokens=False)
+        r_encoding = backend.encode(response, add_special_tokens=False)
+        p, r = p_encoding.ids, r_encoding.ids
         if not r:
             raise ValueError("Attribution requires nonempty response tokens")
         conditioned = cfg["input_mode"] == "prompt_response"
@@ -21,12 +25,17 @@ def tokenize_pairs(tokenizer, pairs: list[tuple[str, str]], cfg: dict):
         if budget < 1:
             raise ValueError("No token budget remains for the response")
         retained_r = r[:budget]
-        args = (retained_p, retained_r) if conditioned else (retained_r,)
-        features.append(
-            tokenizer.prepare_for_model(
-                *args, add_special_tokens=True, truncation=False, return_attention_mask=True
-            )
+        p_encoding.truncate(len(retained_p))
+        r_encoding.truncate(len(retained_r))
+        processed = (
+            backend.post_process(p_encoding, r_encoding, add_special_tokens=True)
+            if conditioned
+            else backend.post_process(r_encoding, add_special_tokens=True)
         )
+        feature = {"input_ids": processed.ids, "attention_mask": processed.attention_mask}
+        if "token_type_ids" in tokenizer.model_input_names:
+            feature["token_type_ids"] = processed.type_ids
+        features.append(feature)
         audit.append(
             {
                 "prompt_tokens": len(p),
@@ -39,10 +48,26 @@ def tokenize_pairs(tokenizer, pairs: list[tuple[str, str]], cfg: dict):
 
 
 class AttributionEncoder(nn.Module):
-    def __init__(self, backbone, projection_dim: int, num_teachers: int):
+    def __init__(
+        self,
+        backbone,
+        projection_dim: int,
+        num_teachers: int,
+        representation: str = "semantic",
+        structure_layer: int = 1,
+    ):
         super().__init__()
         self.backbone = backbone
         hidden = backbone.config.hidden_size
+        self.representation, self.structure_layer = representation, structure_layer
+        if representation not in {"semantic", "structure", "fusion"}:
+            raise ValueError("Unknown representation")
+        if representation != "semantic":
+            if not 0 < structure_layer < backbone.config.num_hidden_layers + 1:
+                raise ValueError("Structure layer must name an encoder layer")
+            self.structure = nn.Sequential(nn.Linear(hidden, hidden), nn.GELU())
+        if representation == "fusion":
+            self.fusion = nn.Sequential(nn.Linear(hidden * 2, hidden), nn.GELU())
         self.projection = nn.Sequential(
             nn.Linear(hidden, hidden), nn.GELU(), nn.Linear(hidden, projection_dim)
         )
@@ -55,12 +80,29 @@ class AttributionEncoder(nn.Module):
         )
         if cfg["max_length"] > getattr(backbone.config, "max_position_embeddings", 10**9):
             raise ValueError("Encoder max_length exceeds backbone context")
-        return cls(backbone, cfg["projection_dim"], num_teachers)
+        return cls(
+            backbone,
+            cfg["projection_dim"],
+            num_teachers,
+            cfg.get("representation", "semantic"),
+            cfg.get("structure_layer", 1),
+        )
 
     def forward(self, projected: bool = True, **tokens):
-        hidden = self.backbone(**tokens).last_hidden_state
+        outputs = self.backbone(
+            **tokens, output_hidden_states=projected and self.representation != "semantic"
+        )
+        hidden = outputs.last_hidden_state
         mask = tokens["attention_mask"].unsqueeze(-1)
         pooled = (hidden * mask).sum(dim=1) / mask.sum(dim=1).clamp_min(1)
+        if projected and self.representation != "semantic":
+            early = outputs.hidden_states[self.structure_layer]
+            structure = self.structure((early * mask).sum(dim=1) / mask.sum(dim=1).clamp_min(1))
+            pooled = (
+                self.fusion(torch.cat([structure, pooled], dim=-1))
+                if self.representation == "fusion"
+                else structure
+            )
         emb = F.normalize(self.projection(pooled) if projected else pooled, dim=-1)
         return emb, self.classifier(emb) if projected else None
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 
 import numpy as np
-from sklearn.metrics import confusion_matrix, roc_auc_score
+from sklearn.metrics import confusion_matrix, f1_score, roc_auc_score
 
 
 def classification_metrics(scores, labels, teacher_ids: list[str]) -> dict:
@@ -25,6 +25,14 @@ def classification_metrics(scores, labels, teacher_ids: list[str]) -> dict:
     return {
         "num_rows": len(labels),
         "accuracy": float(np.mean(pred == labels)),
+        "chance_accuracy": 1 / len(teacher_ids),
+        "macro_f1": float(
+            f1_score(labels, pred, labels=range(len(teacher_ids)), average="macro", zero_division=0)
+        ),
+        "per_teacher_accuracy": {
+            t: float(np.mean(pred[labels == i] == i)) if np.any(labels == i) else None
+            for i, t in enumerate(teacher_ids)
+        },
         "top2_accuracy": float(
             np.mean(np.any(np.argsort(-scores, axis=1)[:, :2] == labels[:, None], axis=1))
         ),
