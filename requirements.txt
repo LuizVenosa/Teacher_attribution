@@ -1,17 +1,2 @@
-accelerate
-datasets
-evaluate
-matplotlib
-numpy
-pandas
-protobuf
-pyarrow
-pyyaml
-scikit-learn
-sentence-transformers
-sentencepiece
-spacy
-tiktoken
-torch
-tqdm
-transformers
+# Optional compatibility entry point; pyproject.toml is the dependency source.
+-e .[models,data]

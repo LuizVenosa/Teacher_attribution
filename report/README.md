@@ -1,32 +1,13 @@
-# ACL Report
+# Historical report — not regenerated research results
 
-This folder contains the ACL-style final project report source, bibliography,
-style files, figures, and compiled PDF.
+The PDFs, LaTeX, figures, and legacy result files describe the original four-label experiment. They predate the corrected pipeline and should not be presented as evidence for its performance.
 
-Files:
+Known issues: LaMini labels conflate base ancestry with teaching; original split sampling allows overlap; long prompts can remove response tokens; QuaRel is named in the text but absent from saved results; set-level results use only 80 sampled sets. See `docs/refactor.md` and the publication review for details.
 
-- `teacher_attribution_acl_draft.tex`: main report source.
-- `teacher_attribution_acl_draft.pdf`: compiled report PDF.
-- `references.bib`: bibliography.
-- `figures/00_latent_space_hero.png`: first-page latent-space visualization.
-- `figures/01_training_loss_accuracy.png`: training loss and validation-accuracy curve.
-- `figures/13_confusion_progression.png`: set-level confusion-matrix progression.
+`legacy_configs/` preserves the old configuration files for interpreting historical artifacts. It is not an executable experiment preset. The supplied `ta_report_final.pdf` differs from the tracked LaTeX draft; obtain its authoritative source before revising or rebuilding that final PDF. No numerical claims have been updated without rerunning experiments.
 
-The ACL style files used for compilation are included:
-
-```text
-acl.sty
-acl_natbib.bst
-```
-
-Compile with:
+To compile the historical draft, if needed:
 
 ```bash
 latexmk -pdf teacher_attribution_acl_draft.tex
-```
-
-If a minimal TinyTeX install is missing ACL dependencies, install the missing LaTeX packages first, for example:
-
-```bash
-tlmgr install caption microtype upquote
 ```

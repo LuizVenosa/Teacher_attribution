@@ -1,455 +1,120 @@
 # Teacher Attribution
 
-Prompt-conditioned contrastive attribution for **public teacher-student language-model pairs**.
+A small pipeline for output-based model-lineage experiments: **prepare → generate → build → train → evaluate**.
 
-This version skips student distillation. Instead, it uses existing public student models whose model cards document a teacher or source model. For each shared prompt, the pipeline generates:
+The default is a **two-label public-lineage pilot**: DistilGPT2/GPT-2 and MiniPLM/Qwen1.5. Their transfer mechanisms differ (logit distillation versus teacher-guided data selection). The same public student checkpoints occur in training and testing, so this pilot measures recognition of known student lineages. It does not isolate teacher influence from student identity or establish generalization to unseen students.
 
-```text
-candidate teacher responses
-public student response
-true teacher label from the documented lineage
-```
+LaMini/FLAN pairs were removed from the active benchmark: FLAN is their initialization checkpoint, while GPT-3.5 generated the instruction-training responses. The previous four-way report and results remain historical artifacts; they are not results of this pipeline.
 
-Then it trains and evaluates a contrastive prompt-response encoder that pulls each student response toward its documented teacher response and pushes it away from other same-prompt teacher responses.
+## Install
 
-## Public Lineage Pairs
-
-| Teacher ID | Teacher model | Student ID | Student model | Evidence level |
-|---|---|---|---|---|
-| `gpt2` | `gpt2` | `distilgpt2` | `distilbert/distilgpt2` | High: DistilGPT2 model card says it was supervised by GPT-2 124M. |
-| `qwen15_18b` | `Qwen/Qwen1.5-1.8B` | `miniplm_qwen_200m` | `MiniLLM/MiniPLM-Qwen-200M` | High: MiniPLM card/dataset metadata names Qwen1.5-1.8B as teacher. |
-| `flan_t5_base` | `google/flan-t5-base` | `lamini_flan_t5_248m` | `MBZUAI/LaMini-Flan-T5-248M` | Medium: Flan-T5-base family / instruction-distilled lineage. |
-| `flan_t5_small` | `google/flan-t5-small` | `lamini_flan_t5_77m` | `MBZUAI/LaMini-Flan-T5-77M` | Medium: Flan-T5-small family / instruction-distilled lineage. |
-
-The model list lives in `configs/public_lineage_models.yaml`.
-
-An expanded candidate pool lives in `configs/public_lineage_models_extended.yaml`.
-It includes the default four pairs plus documented SmolLM2, Llama, and Qwen3
-distillation candidates. See `docs/public_lineage_candidate_pairs.md` for the
-evidence notes and recommended subset order before running the heavier models.
-
-## Pipeline
-
-```text
-1. Build a shared prompt bank
-2. Generate responses from public teacher models
-3. Generate responses from public student models
-4. Build attribution JSONL pairs
-5. Run lexical and embedding baselines
-6. Train the contrastive attribution encoder
-7. Evaluate single-prompt and set-level attribution
-```
-
-There is no `make_sft_data.py`, no LoRA student training, and no generated student checkpoints.
-
-## Final Reported Experiment
-
-The final report uses the clean four-way public-lineage setup and the compact
-MiniLM encoder, `sentence-transformers/all-MiniLM-L6-v2`.  The cluster run
-generated teacher and student outputs for the four default pairs, built 12,000
-test attribution rows (3,000 prompts x 4 teacher labels), and trained the
-contrastive encoder on 29,742 training prompts per teacher/student lineage.
-
-The default configs in this repository now point to the final reported MiniLM
-setup:
-
-```text
-configs/public_lineage_models.yaml
-configs/public_lineage_attribution.yaml
-```
-
-The smaller tracked prompt files in `data/prompts/` are included as lightweight
-examples and smoke-test inputs.  The full final prompt bank is regenerated from
-the public/local WTYT-style datasets with the command in
-[Build Prompts](#build-prompts), because the generated teacher/student outputs
-and attribution-pair JSONL files are larger derived artifacts.
-
-Final MiniLM contrastive result:
-
-| Split / setting | Accuracy | Top-2 accuracy | Macro ROC-AUC | Notes |
-|---|---:|---:|---:|---|
-| Validation, best checkpoint | 0.6055 | 0.8307 | 0.6822 | Best epoch 10, early stopped at epoch 14. |
-| Test, single prompt | 0.6044 | 0.8284 | 0.6814 | Main reportable test result. |
-| Test, set size 4 | 0.9000 | 0.9875 | 0.9060 | Averaged over prompt sets. |
-| Test, set size 8 | 0.9750 | 1.0000 | 0.9615 | Averaged over prompt sets. |
-| Test, set size 16+ | 1.0000 | 1.0000 | 0.9752+ | Averaged over prompt sets. |
-
-Single-prompt MiniLM test accuracy by task:
-
-| Task | Accuracy |
-|---|---:|
-| QA | 0.8418 |
-| Instruction following | 0.6090 |
-| Summarization | 0.4447 |
-
-MiniLM ablation summary:
-
-| Run | Test accuracy | Top-2 accuracy | Macro ROC-AUC | Interpretation |
-|---|---:|---:|---:|---|
-| `lr5e5` | 0.6008 | 0.8286 | 0.6779 | Best ablation by test accuracy. |
-| `temp003` | 0.6003 | 0.8286 | 0.6635 | Similar accuracy, weaker AUC. |
-| `cls010` | 0.5993 | 0.8295 | 0.6755 | Similar to baseline. |
-| `baseline_temp005_cls02_lr2e5` | 0.5988 | 0.8286 | 0.6769 | Five-epoch MiniLM baseline. |
-| `temp007` | 0.5976 | 0.8297 | 0.6843 | Best ablation AUC, not best accuracy. |
-| `proj256` | 0.5968 | 0.8289 | 0.6768 | Best validation accuracy among ablations, but not best test accuracy. |
-| `cls050` | 0.5955 | 0.8295 | 0.6775 | Higher classification weight did not help. |
-
-The ablations are useful for analysis, but none surpassed the full MiniLM run trained with early stopping.
-
-Small final-result files are included with the repository despite the broad
-`results/**` ignore rule:
-
-```text
-results/baselines/public_lineage_test_metrics.json
-results/contrastive/public_lineage_minilm_probe_metrics_no_sentence.json
-results/contrastive_ablation/ablation_summary.csv
-results/contrastive_ablation/eval_summary.csv
-results/contrastive_ablation/epoch_progression.csv
-report/figures/
-```
-
-Large generated files are intentionally not committed:
-
-```text
-data/public_lineage/*_outputs/
-data/attribution/*_pairs.jsonl
-models/attribution_encoder/*/*.pt
-external_datasets/
-```
-
-Larger encoders, more model pairs, and harder cross-dataset/paraphrased-prompt
-settings are left as future work rather than part of the final reported result.
-
-## Setup
+Python 3.10 or newer. From the repository root:
 
 ```bash
-git clone git@github.com:LuizVenosa/Teacher_attribution.git
-cd Teacher_attribution
 python -m venv .venv
-source .venv/bin/activate
-pip install -e .
+# Linux: source .venv/bin/activate
+# PowerShell: .venv\Scripts\Activate.ps1
+python -m pip install -e ".[models,data,dev]"
 ```
 
-For Bocconi HPC jobs, `jobs/00_setup_env.sh` loads `miniconda3`, CUDA, activates `teacherattr`, keeps Hugging Face caches inside the project by default, and reads an optional private Hugging Face token from `~/.hf_token`.
+For the locked dependency versions, use `uv sync --all-extras --locked` instead of the pip install, then activate `.venv`. The lockfile covers supported Python/platform combinations; the CPU integration tests were run on Python 3.12 on Windows.
 
-## Build Prompts
+The core package only requires NumPy, scikit-learn, and PyYAML. Model and source-dataset dependencies are optional extras. There is no separate BERTScore service, POS parser, set network, or notebook pipeline to maintain.
 
-Use the strict Who Taught You That task-source mix from local Parquet/CSV files:
+## Configure once
+
+Edit `configs/experiment.yaml`. All paths in it are relative to the config file, including `run_dir`. The first stage saves the resolved configuration; changing it requires a new run directory. Use immutable Hub commit revisions for final experiments. Resolved model commits, input hashes, generation settings, and package versions are recorded where available.
+
+The default reads existing local Parquet files under `external_datasets/who_taught_you_that`. Each source directory can also contain JSONL files with the original dataset schema. The old `sumpubmed` directory is accepted as a location for `ccdv/pubmed-summarization/section`, but outputs correctly call it `pubmed`. There is no silent substitution or missing-dataset fallback. Set `data.local_dir: null` to read the explicitly named public sources through Hugging Face Datasets; persist the resulting prompt files for reproducibility.
+
+`prompts_per_dataset` specifies exact targets **per source**, not total row counts. Reduce targets for an initial smoke run. The default uses six sources and 1,000/200/200 prompts per source. The source loader stops after filling the requested deterministic subsets; these are not official benchmark splits or uniform full-corpus samples.
+
+## Run
 
 ```bash
-PYTHONPATH=src python scripts/make_prompt_bank.py \
-  --source who_taught_you_that \
-  --local-data-dir external_datasets/who_taught_you_that \
-  --datasets cnn_dailymail,sumpubmed,rotten_tomatoes,commonsenseqa,openbookqa,quarel,alpaca \
-  --train-size 30000 \
-  --val-size 3000 \
-  --test-size 3000
+teacher-attr prepare
+teacher-attr generate
+teacher-attr build
+teacher-attr audit
+teacher-attr train
+teacher-attr evaluate --frozen --checkpoint runs/public_lineage_v2/models/joint_prompt_response_seed13/best.pt
 ```
 
-The completed cluster run produced 29,742 train prompts after dataset availability and filtering, plus 3,000-prompt validation/test style evaluation files.
-
-For a tiny smoke test:
+`python -m teacher_attr` is equivalent to `teacher-attr`. For another config, put the option before the command:
 
 ```bash
-PYTHONPATH=src python scripts/make_prompt_bank.py \
-  --source synthetic \
-  --train-size 32 \
-  --val-size 16 \
-  --test-size 16
+teacher-attr --config configs/my_experiment.yaml prepare
 ```
 
-## Cluster Execution
+Generation can be divided into independent cluster jobs:
 
 ```bash
-cd /mnt/beegfsstudents/home/3191856/NLP_project/Teacher_attribution
-mkdir -p logs
-
-# 1. Generate public teacher and public student outputs. No arrays.
-sbatch jobs/01_generate_public_lineage_outputs.sbatch
-
-# 2. Build train/val/test attribution pair files.
-sbatch jobs/04_build_public_lineage_attribution.sbatch
-
-# 3. Run baselines.
-sbatch jobs/06_eval_public_lineage.sbatch baselines
-
-# 4. Train the final reported MiniLM contrastive encoder.
-sbatch --time=08:00:00 jobs/05_train_public_lineage_contrastive.sbatch
-
-# 5. Evaluate set-level attribution.
-sbatch jobs/06_eval_public_lineage.sbatch encoder
-
-# 6. Evaluate frozen contrastive probes used in the final report.
-SKIP_SENTENCE_BASELINE=1 sbatch jobs/08_eval_contrastive_probes.sbatch
-
-# 7. Regenerate report figures.
-sbatch jobs/09_plot_latent_space_hero.sbatch
+teacher-attr generate --role teachers --model gpt2 --split test
+teacher-attr generate --role students --model distilgpt2 --split test
 ```
 
-To run the expanded candidate pool instead of the default four-pair setup:
+Existing outputs resume after checking their configuration and prompt hashes. Each prompt uses a deterministic seed, so resuming does not change subsequent random draws. Use one writer per model/split output. Generation processes one prompt at a time for a straightforward reproducible baseline; it is slower than optimized batched inference. Every model receives the exact stored prompt content. If a prompt exceeds a model's token budget, generation fails; shorten the common character limit and prepare a new run rather than truncating differently for each model.
+
+Activate the environment on the cluster before submitting. A single wrapper replaces the old job collection:
 
 ```bash
-MODELS_CONFIG=configs/public_lineage_models_extended.yaml \
-sbatch jobs/01_generate_public_lineage_outputs.sbatch
-
-MODELS_CONFIG=configs/public_lineage_models_extended.yaml \
-sbatch jobs/04_build_public_lineage_attribution.sbatch
+sbatch --account=YOUR_ACCOUNT jobs/run.sbatch generate --role teachers --model gpt2
+sbatch --account=YOUR_ACCOUNT jobs/run.sbatch train
 ```
 
-For the first expanded run, prefer a medium-size subset before adding the heavy
-Qwen3 MoE teacher:
+Submit stages after their dependencies complete. Override resource requests with `sbatch` options. The wrapper contains no account credentials, email notifications, or machine-specific paths.
+
+## Essential controls
 
 ```bash
-MODELS_CONFIG=configs/public_lineage_models_extended.yaml \
-TEACHER_LIST="gpt2 qwen15_18b flan_t5_base flan_t5_small llama32_3b_instruct smollm2_17b_instruct" \
-STUDENT_LIST="distilgpt2:miniplm_qwen_200m:lamini_flan_t5_248m:lamini_flan_t5_77m:lrc_15b_sft:d_smollm2_360m" \
-sbatch jobs/01_generate_public_lineage_outputs.sbatch
+teacher-attr train --objective classification
+teacher-attr train --objective contrastive
+teacher-attr train --input-mode response
+teacher-attr train --seed 42
+teacher-attr evaluate --name lexical
+teacher-attr evaluate --frozen --name frozen
+teacher-attr evaluate --checkpoint PATH_TO_AN_ABLATION/best.pt --name classification
 ```
 
-If you previously generated public-lineage outputs, move or delete the old
-`data/public_lineage` directory before switching configs so old student JSONL
-files do not get mixed into the new attribution build.
+Training uses the same configured epoch ceiling, patience, batch size, and optimizer across ablations. Joint/contrastive runs select checkpoints by validation cosine retrieval accuracy; classification-only runs use validation classifier accuracy. Logistic-regression regularization is selected on validation data, never test data. The frozen control uses the pretrained backbone's mean-pooled representation without a random projection.
 
+The encoder supports response-only inputs or separately budgeted prompt/response pairs. At most `max_prompt_tokens` are spent on the prompt; the rest of the context is reserved for the response and special tokens. Evaluation saves actual retained-token counts. Training uses float32 and checks for nonfinite losses/gradients; mixed-precision branches were removed.
 
-## Who Taught You That Comparability
+## What is saved
 
-To make the results comparable to *Who Taught You That?*, report two tracks:
-
-1. **WTYT-style protocol results**: same broad task families, same student-response-only attribution setting, same support-size curves, and text-feature baselines.
-2. **Our contrastive extension**: same data splits and lineage labels, but with prompt-conditioned same-prompt teacher negatives and learned embeddings.
-
-The important caveat is that this repo uses **public documented lineage pairs** instead of training every student from scratch on teacher outputs. That makes the protocol comparable, but the student construction is not identical to the paper's controlled distillation setup.
-
-For the closest WTYT-style table, build prompts with the full dataset mix:
-
-```bash
-PYTHONPATH=src python scripts/make_prompt_bank.py \
-  --source who_taught_you_that \
-  --local-data-dir external_datasets/who_taught_you_that \
-  --datasets cnn_dailymail,sumpubmed,rotten_tomatoes,commonsenseqa,openbookqa,quarel,alpaca \
-  --train-size 30000 \
-  --val-size 3000 \
-  --test-size 3000
-```
-
-This uses a balanced maximum across all seven WTYT task sources, so QuaRel and OpenBookQA do not disappear under the much larger summarization/review datasets.
-
-Current baseline evaluator:
-
-```bash
-sbatch jobs/06_eval_public_lineage.sbatch baselines
-```
-
-It reports WTYT-style text baselines that are currently reproducible in this repo:
+Everything for a new experiment lives under its run directory:
 
 ```text
-bow_same_prompt
-bertscore_same_prompt
-bow_classifier
-ngram_1_4_classifier
+experiment.json              resolved immutable configuration
+prompts/{train,val,test}.jsonl
+prompts/manifest.json         source descriptions, hashes, split counts
+outputs/{teachers,students}/MODEL/SPLIT.jsonl
+outputs/.../SPLIT.meta.json   generation configuration and resolved model revision
+pairs/{train,val,test}.jsonl
+pairs/manifest.json           alignment provenance and hashes
+models/OBJECTIVE_INPUT_seedN/ best.pt, training.json, tokenizer/, backbone/
+evaluations/NAME/             metrics.json, predictions.jsonl, support_sets.jsonl,
+                             summary.md, token_audit.json (when encoding)
 ```
 
-The POS-template baseline from the paper is intentionally excluded from the main comparison because it was not reliably replicated in the current environment.
+Evaluations include word/punctuation 1–4 grams, character 1–5 grams, and length/format controls, plus optional frozen/trained cosine retrieval and linear probes. Classifier-head results are included only when that head was trained. Failed baselines fail the command.
 
-Output:
+Every method uses the **arithmetic mean of its per-prompt scores** on exactly the same saved support sets. Size one uses every test row. Larger sets are sampled from one student checkpoint, both across all tasks and within each dataset. Sets may overlap across repetitions. Accuracy confidence intervals and paired differences versus word n-grams resample whole prompts. Set-level Monte Carlo intervals measure support-sampling variation conditional on the fixed response pool. Neither interval estimates uncertainty over a population of student models.
 
-```text
-results/baselines/public_lineage_test_metrics.json
-```
+## Moving beyond the public pilot
 
-Use these as the directly comparable baseline table. Use the contrastive encoder results as the proposed-method table.
-Outputs from teacher/student generation are stored separately from older experiments:
+Supply multiple genuinely distinct student checkpoints per teacher, record each checkpoint's actual teacher and evidence, assign each student to explicit `splits`, and set `protocol: held_out_students`. The config then requires disjoint checkpoint identities between train, validation, and test and complete teacher coverage in each split. Model aliases cannot bypass this check when they share the same configured Hub path/revision. Independently verify aliases and pin revisions when defining a benchmark.
 
-```text
-data/public_lineage/teacher_outputs/
-data/public_lineage/student_outputs/
-```
+The repository accepts those controlled checkpoints; it does not train distilled students. A publication experiment should control student base, data, and training budget across teachers, repeat distillation/training seeds, and include undistilled controls. Open-world rejection and a faithful WTYT POS-template replication remain research extensions, not implemented results.
 
-Attribution files are written to:
-
-```text
-data/attribution/train_pairs.jsonl
-data/attribution/val_pairs.jsonl
-data/attribution/test_pairs.jsonl
-```
-
-## Smoke Runs
-
-Restrict generation to two lightweight pairs:
+## Checks and historical files
 
 ```bash
-TEACHER_LIST="gpt2 qwen15_18b" \
-STUDENT_LIST="distilgpt2:miniplm_qwen_200m" \
-SPLIT_LIST="train val test" \
-sbatch jobs/01_generate_public_lineage_outputs.sbatch
+python -m pytest
+ruff check src tests
+ruff format --check src tests
 ```
 
-Run only one split:
+Tests cover split overlap, duplicate IDs, alignment, response-token preservation, binary AUC, shared support sets, artifact mismatch handling, and a tiny local-model integration run. They do not claim to reproduce the historical cluster results.
 
-```bash
-SPLIT_LIST="test" sbatch jobs/01_generate_public_lineage_outputs.sbatch
-SPLIT_LIST="test" sbatch jobs/04_build_public_lineage_attribution.sbatch
-```
-
-## Attribution Pair Schema
-
-```json
-{
-  "prompt_id": "qa_000001",
-  "anchor_student_id": "student_from_gpt2",
-  "true_teacher": "gpt2",
-  "prompt": "Why do objects fall at the same rate in a vacuum?",
-  "student_response": "In a vacuum, objects fall at the same rate because...",
-  "teacher_responses": {
-    "gpt2": "Objects fall because...",
-    "qwen15_18b": "In a vacuum, gravitational acceleration...",
-    "flan_t5_base": "Objects fall at the same rate because...",
-    "flan_t5_small": "Without air resistance..."
-  },
-  "label": 0
-}
-```
-
-The negatives are wrong-teacher responses to the **same prompt**, which is the main guardrail against topic leakage.
-
-## Offline Dataset Download
-
-If Hugging Face dataset downloads are painful on the cluster, download them elsewhere first:
-
-```bash
-PYTHONPATH=src python scripts/download_wtyt_datasets.py \
-  --output-dir external_datasets/who_taught_you_that \
-  --datasets cnn_dailymail,sumpubmed,rotten_tomatoes,commonsenseqa,openbookqa,quarel,alpaca \
-  --format auto \
-  --allow-missing-datasets
-```
-
-Then build prompts from local Parquet/CSV:
-
-```bash
-PYTHONPATH=src python scripts/make_prompt_bank.py \
-  --source who_taught_you_that \
-  --local-data-dir external_datasets/who_taught_you_that \
-  --datasets commonsenseqa,openbookqa,alpaca,rotten_tomatoes \
-  --train-size 1000 \
-  --val-size 300 \
-  --test-size 300 \
-  --allow-missing-datasets
-```
-
-## Key Files
-
-- `configs/public_lineage_models.yaml`: public teacher/student pairs and labels.
-- `configs/public_lineage_generation.yaml`: decoding settings for public teachers/students.
-- `configs/public_lineage_attribution.yaml`: contrastive encoder training settings.
-- `scripts/generate_public_teachers.py`: teacher response generation.
-- `scripts/generate_public_students.py`: public student response generation.
-- `scripts/build_attribution_pairs.py`: alignment into InfoNCE rows.
-- `scripts/run_baselines.py`: BoW similarity, BERTScore similarity, BoW classifier, and 1-4 gram classifier baselines.
-- `scripts/train_contrastive_encoder.py`: prompt-conditioned InfoNCE encoder.
-- `scripts/evaluate.py`: set-level attribution evaluation.
-- `scripts/evaluate_contrastive_probes.py`: frozen contrastive encoder probes plus response-only cosine baselines.
-
-## Contrastive Training And Ablations
-
-The contrastive encoder uses a high epoch ceiling with validation early stopping. In `configs/public_lineage_attribution.yaml`:
-
-```yaml
-num_epochs: 30
-early_stopping_metric: accuracy
-early_stopping_mode: max
-early_stopping_patience: 6
-early_stopping_min_delta: 0.002
-```
-
-This means training may run for up to 30 epochs, but it stops when validation accuracy has not improved by at least `0.002` for 6 consecutive epochs. The trainer saves:
-
-```text
-models/attribution_encoder/<run_name>/best.pt
-models/attribution_encoder/<run_name>/last.pt
-models/attribution_encoder/<run_name>/training_metrics.json
-```
-
-Run the main contrastive training job:
-
-```bash
-sbatch jobs/05_train_public_lineage_contrastive.sbatch
-```
-
-A compact no-array ablation sweep is also available:
-
-```bash
-sbatch jobs/05_ablate_public_lineage_contrastive.sbatch
-```
-
-By default it runs a sequential compact sweep over temperature, classification-loss weight, learning rate, and projection size. The current compact sweep uses fixed 5-epoch runs and disables early stopping so curves are comparable. Results are written to:
-
-```text
-results/contrastive_ablation/ablation_summary.csv
-results/contrastive_ablation/ablation_summary.json
-results/contrastive_ablation/eval_summary.csv
-results/contrastive_ablation/epoch_progression.csv
-models/attribution_encoder/public_lineage_ablations/
-```
-
-For a custom grid, override environment variables at submit time:
-
-```bash
-ABLATION_MODE=grid \
-TEMPERATURES="0.03,0.05,0.07,0.1" \
-CLASSIFICATION_WEIGHTS="0.1,0.2,0.5" \
-LEARNING_RATES="0.00002,0.00005" \
-MAX_LENGTHS="512,768" \
-PROJECTION_DIMS="128,256" \
-MAX_RUNS=12 \
-sbatch jobs/05_ablate_public_lineage_contrastive.sbatch
-```
-
-Keep `MAX_RUNS` modest on the student cluster because this job runs experiments sequentially inside one allocation.
-
-## Contrastive Probe Evaluation
-
-The main encoder evaluation uses nearest-neighbor cosine retrieval in the learned teacher space. To check whether the learned embedding is more useful with a stronger but still simple decision rule, run the frozen-probe evaluation:
-
-```bash
-sbatch jobs/08_eval_contrastive_probes.sbatch
-```
-
-By default this evaluates the MiniLM checkpoint:
-
-```text
-models/attribution_encoder/public_lineage_minilm_contrastive/best.pt
-```
-
-and writes:
-
-```text
-results/contrastive/public_lineage_minilm_probe_metrics.json
-```
-
-The JSON includes four contrastive-encoder variants:
-
-```text
-cosine_retrieval
-classifier_head
-embedding_logreg
-cosine_score_logreg
-```
-
-It also includes simple response-only cosine baselines:
-
-```text
-bow_response_cosine
-tfidf_response_cosine
-sentence_response_cosine
-```
-
-These baselines compare each student output to the same-prompt candidate teacher outputs by cosine similarity only, so they are easier to compare directly against contrastive nearest-neighbor retrieval.
-
-Override paths or skip the sentence baseline if the checkpoint is not cached:
-
-```bash
-SKIP_SENTENCE_BASELINE=1 \
-ENCODER_OUTPUT=results/contrastive/public_lineage_minilm_probe_metrics_no_sentence.json \
-sbatch jobs/08_eval_contrastive_probes.sbatch
-```
+`report/` and the existing `results/` contain the earlier experiment. See `report/README.md` and `docs/refactor.md` before interpreting those numbers. New outputs go exclusively under `runs/`; the old scripts and duplicate configs have been removed from the active workflow.

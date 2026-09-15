@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Iterable
-
+from typing import Any
 
 JsonRow = dict[str, Any]
 
@@ -38,13 +38,6 @@ def append_jsonl(path: str | Path, rows: Iterable[JsonRow]) -> None:
     with path.open("a", encoding="utf-8") as f:
         for row in rows:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
-
-
-def existing_ids(path: str | Path, key: str) -> set[str]:
-    path = Path(path)
-    if not path.exists():
-        return set()
-    return {str(row[key]) for row in read_jsonl(path) if key in row}
 
 
 def load_yaml(path: str | Path) -> dict[str, Any]:

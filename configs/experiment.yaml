@@ -1,0 +1,73 @@
+# A two-label public-lineage pilot, NOT a controlled teacher-attribution benchmark.
+run_dir: ../runs/public_lineage_v2
+seed: 13
+protocol: public_seen_students
+
+teachers:
+  gpt2:
+    hf_name: openai-community/gpt2
+    revision: main
+    prompt_format: completion
+  qwen15_18b:
+    hf_name: Qwen/Qwen1.5-1.8B
+    revision: main
+    prompt_format: completion
+
+students:
+  distilgpt2:
+    hf_name: distilbert/distilgpt2
+    revision: main
+    prompt_format: completion
+    teacher: gpt2
+    relation: logit_distillation
+    base_checkpoint: GPT-2 initialization
+    evidence_url: https://huggingface.co/distilbert/distilgpt2
+    splits: [train, val, test]
+  miniplm_qwen_200m:
+    hf_name: MiniLLM/MiniPLM-Qwen-200M
+    revision: main
+    prompt_format: completion
+    teacher: qwen15_18b
+    relation: data_selection
+    base_checkpoint: trained from scratch
+    evidence_url: https://huggingface.co/MiniLLM/MiniPLM-Qwen-200M
+    splits: [train, val, test]
+
+data:
+  # Paths are relative to this config. Existing downloaded Parquet files work.
+  local_dir: ../external_datasets/who_taught_you_that
+  datasets: [cnn_dailymail, pubmed, rotten_tomatoes, commonsenseqa, openbookqa, alpaca]
+  prompts_per_dataset: {train: 1000, val: 200, test: 200}
+  split_fractions: {train: 0.8, val: 0.1, test: 0.1}
+  max_input_chars: 1200
+  include_qa_answer: true
+
+generation:
+  max_input_tokens: 512
+  max_new_tokens: 128
+  temperature: 0.7
+  top_p: 0.9
+  # Each prompt gets its own seed; resuming reproduces uninterrupted generation.
+  dtype: float32
+
+encoder:
+  hf_name: sentence-transformers/all-MiniLM-L6-v2
+  revision: main
+  input_mode: prompt_response
+  max_length: 512
+  max_prompt_tokens: 128
+  projection_dim: 128
+  objective: joint
+  temperature: 0.05
+  classification_weight: 0.2
+  epochs: 15
+  batch_size: 16
+  learning_rate: 0.00002
+  weight_decay: 0.01
+  patience: 4
+
+evaluation:
+  set_sizes: [1, 2, 4, 8, 16]
+  set_repeats: 200
+  bootstrap_repeats: 1000
+  logreg_c: [0.1, 1.0, 10.0]
