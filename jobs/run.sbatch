@@ -15,15 +15,18 @@
 
 set -euo pipefail
 export PROJECT_ROOT="${PROJECT_ROOT:-${SLURM_SUBMIT_DIR:?Submit from the repository root}}"
+source "$PROJECT_ROOT/jobs/runtime_cache.sh"
 source "$PROJECT_ROOT/jobs/00_setup_env.sh"
 if [ "$#" -eq 0 ]; then
   echo "Usage: sbatch jobs/run.sbatch COMMAND [options]" >&2
   exit 2
 fi
-# Bocconi compute nodes have no internet. Prepare prompts and cache weights first.
-export HF_HUB_OFFLINE=1
-export TRANSFORMERS_OFFLINE=1
-export HF_DATASETS_OFFLINE=1
+# Set after environment activation, which may modify inherited variables.
+if [[ "$MODEL_CACHE_MODE" == runtime ]]; then
+  export HF_HUB_OFFLINE=0 TRANSFORMERS_OFFLINE=0 HF_DATASETS_OFFLINE=0
+else
+  export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_DATASETS_OFFLINE=1
+fi
 export PYTHONUNBUFFERED=1
 export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-8}"
 export TOKENIZERS_PARALLELISM=false

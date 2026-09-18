@@ -10,7 +10,10 @@ No email notifications are enabled.
 
 ## Prepare once on the login node
 
-Compute nodes have no internet. Use shared storage visible from both nodes.
+Earlier jobs documented no internet on compute nodes. Runtime downloading now
+requires outbound Hugging Face access on those nodes; if that restriction remains,
+use `MODEL_CACHE_MODE=offline` with weights cached on approved shared storage.
+Use shared storage visible from both nodes for persistent experiment outputs.
 The default cache is inside the repository, matching the old student setup
 which did not assume access to `/scratch`. Override `CACHE_ROOT` or `HF_HOME`
 consistently for both preparation and submission if using another shared disk.
@@ -26,9 +29,10 @@ hf auth login
 python -m teacher_attr preflight
 python -m teacher_attr pin --output configs/research.pinned.yaml
 export CONFIG=configs/research.pinned.yaml
-python scripts/cache_cluster_models.py --config "$CONFIG"
+# Only for offline mode; runtime mode downloads during the GPU job instead:
+# python scripts/cache_cluster_models.py --config "$CONFIG"
 python -m teacher_attr --config "$CONFIG" prepare
-# Confirm tokenizer access from the exact cache the jobs will use.
+# Optional: confirm metadata/tokenizer access from the offline shared cache.
 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_DATASETS_OFFLINE=1 \
   python -m teacher_attr --config "$CONFIG" preflight
 ```
@@ -51,6 +55,35 @@ Create pinned configs on the cluster, not Windows, because they contain resolved
 paths. Do not generate model outputs or train on the login node.
 
 ## Submit individual stages
+
+The default is `MODEL_CACHE_MODE=runtime`. Before Python starts, the job creates
+a unique cache inside `SLURM_TMPDIR`, or inside an explicit `JOB_CACHE_ROOT`.
+If neither is set, it stops with an actionable error. `JOB_CACHE_ROOT` must be an
+existing writable absolute path on approved storage outside home/the repository;
+the launcher does not guess a scratch mount. Confirm its quota and disk capacity
+with the cluster administrator. A path outside home can still be quota-limited.
+
+For example, if the scheduler provides `SLURM_TMPDIR`, submit normally. Otherwise
+export `JOB_CACHE_ROOT` to the actual approved compute-node temporary directory
+before submission. Do not set it to a made-up path or to your home directory.
+Each command's existing `from_pretrained` calls fetch its pinned weights on demand,
+then load them into GPU memory. A teacher-only Qwen job does not fetch all teachers.
+`HF_TOKEN` or the original `HF_TOKEN_PATH` supplies authentication when needed;
+the token itself is never printed or copied into the temporary cache.
+
+Runtime mode requires internet on the compute node. If unavailable, use:
+
+```bash
+export MODEL_CACHE_MODE=offline
+# Configure HF_HOME/HF_HUB_CACHE to the prepared shared cache before submitting.
+```
+
+Per-job temporary caches are not reused between jobs. They follow the storage
+service's cleanup policy; the launcher does not delete them automatically. Outputs
+and student checkpoints still go to the config's persistent `run_dir`; set that
+to approved shared storage with sufficient quota. Runtime caching does not solve
+checkpoint storage or student-training resume. Failed network downloads surface
+as job errors; no fallback silently downloads into home.
 
 ```bash
 export CONFIG=configs/research.pinned.yaml
@@ -91,8 +124,9 @@ bash scripts/submit_slurm.sh --dependency=afterok:12345 -- distill --teacher qwe
 The helper creates `logs/` before SLURM opens the output files and sets the working
 directory. Direct `sbatch jobs/run.sbatch ...` remains supported when submitted
 from the repository root after `mkdir -p logs`. Logs include the GPU, PyTorch and
-CUDA version. Compute jobs force Hugging Face offline mode and never install
-packages. Email is disabled by default, even if the old account has mail settings.
+CUDA version. Offline jobs force Hugging Face offline mode; runtime jobs enable
+network downloads. Neither mode installs packages. Email is disabled by default,
+even if the old account has mail settings.
 
 ## Limits
 
