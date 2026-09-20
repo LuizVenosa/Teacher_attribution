@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections import Counter
 
 import numpy as np
 
@@ -11,7 +12,16 @@ from teacher_attr.generation import output_path, read_outputs
 from teacher_attr.io import load_jsonl, save_json
 
 
-def clean_response(text: str, patterns: list[str]) -> tuple[str, list[str]]:
+def clean_response(
+    text: str, patterns: list[str], terminal_tokens: tuple[str, ...] = ()
+) -> tuple[str, list[str]]:
+    # Only known terminal/padding tokens at the end are harmless framing.
+    text = text.strip()
+    while True:
+        token = next((t for t in terminal_tokens if t and text.endswith(t)), None)
+        if token is None:
+            break
+        text = text[: -len(token)].rstrip()
     flags = []
     if "<|channel>thought" in text:
         blocks = re.findall(r"<\|channel>thought\s*(.*?)<channel\|>", text, flags=re.S)
@@ -32,7 +42,15 @@ def clean_response(text: str, patterns: list[str]) -> tuple[str, list[str]]:
     if re.search(r"<\|.*?\|>|\[/?INST\]", text):
         flags.append("template_markup")
         text = re.sub(r"<\|.*?\|>|\[/?INST\]", "", text)
-    if any(re.search(p, text, re.I) for p in patterns):
+    # Provider names in ordinary factual content are not self-identification.
+    # Match the first-person clause containing the configured identity name.
+    clauses = re.findall(
+        r"\b(?:I\s+am|I'm|I’m|I\s+was|I\s+have\s+been|as\s+an?\b|"
+        r"my\s+(?:name|creator|developer|provider)\s+is)\b[^.!?\n]{0,160}",
+        text,
+        re.I,
+    )
+    if any(re.search(p, clause, re.I) for clause in clauses for p in patterns):
         flags.append("identity_marker")
     if not text.strip():
         flags.append("empty")
@@ -49,6 +67,7 @@ def describe(rows: list[dict], refusal_patterns: list[str]) -> dict:
         "mean_tokens": float(np.mean([r.get("output_tokens", 0) for r in rows])),
         "vocabulary_size": len({w.lower() for r in rows for w in r["response"].split()}),
         "invalid_rate": float(np.mean(invalid)),
+        "flag_counts": dict(Counter(f for r in rows for f in r.get("quality_flags", []))),
         "truncated_rate": float(np.mean([r.get("truncated", False) for r in rows])),
         "refusal_rate": float(
             np.mean(

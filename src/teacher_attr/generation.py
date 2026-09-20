@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.metadata
 import json
+from collections import Counter
 from pathlib import Path
 
 from teacher_attr.config import file_hash, fingerprint, initialize_run
@@ -146,6 +147,7 @@ def generate(cfg: dict, role: str, model_id: str, split: str) -> dict:
     model = cls.from_pretrained(model_cfg["hf_name"], torch_dtype=dtype, **load_kwargs).to(device)
     model.eval()
     metadata = {
+        "response_processing_version": 2,
         "spec": generation_spec(cfg, role, model_id, split),
         "resolved_revision": getattr(model.config, "_commit_hash", None),
         "environment": {p: importlib.metadata.version(p) for p in ("torch", "transformers")},
@@ -226,6 +228,28 @@ def generate(cfg: dict, role: str, model_id: str, split: str) -> dict:
                 stop = next((j for j, token in enumerate(ids) if token in eos_ids), len(ids))
                 used = ids[:stop]
                 text = tokenizer.decode(used, skip_special_tokens=False).strip()
+                # Record token identities/counts, never raw hidden reasoning text.
+                special_ids = set(tokenizer.all_special_ids)
+                diagnostics = {
+                    "generated_tokens": len(used),
+                    "special_tokens": dict(
+                        Counter(
+                            tokenizer.convert_ids_to_tokens(t) for t in used if t in special_ids
+                        )
+                    ),
+                    "ended_with_eos": stop < len(ids),
+                }
+                terminal_tokens = tuple(
+                    dict.fromkeys(
+                        [tokenizer.eos_token or "", tokenizer.pad_token or ""]
+                        + [tokenizer.convert_ids_to_tokens(t) for t in eos_ids]
+                        + [
+                            t
+                            for t in ("<|im_end|>", "<|endoftext|>", "<|eot_id|>", "<end_of_turn>")
+                            if t in tokenizer.all_special_tokens
+                        ]
+                    )
+                )
                 parser_flags = []
                 if model_cfg["prompt_format"] == "chat" and getattr(
                     tokenizer, "response_template", None
@@ -237,13 +261,16 @@ def generate(cfg: dict, role: str, model_id: str, split: str) -> dict:
                             c.get("text", "") for c in content if c.get("type") == "text"
                         )
                     text = content or ""
+                    diagnostics["parser_content_empty"] = not text.strip()
                     if (
                         parsed.get("reasoning_content")
                         or parsed.get("thinking")
                         or parsed.get("reasoning")
                     ):
                         parser_flags.append("reasoning_removed")
-                response, flags = clean_response(text, gen.get("identity_patterns", []))
+                response, flags = clean_response(
+                    text, gen.get("identity_patterns", []), terminal_tokens
+                )
                 flags += parser_flags
                 new_rows.append(
                     {
@@ -254,6 +281,7 @@ def generate(cfg: dict, role: str, model_id: str, split: str) -> dict:
                         "output_tokens": len(used),
                         "truncated": stop == len(ids) and len(ids) >= limit,
                         "quality_flags": flags,
+                        "response_diagnostics": diagnostics,
                         "generation_seed": seed,
                         "generation_config": {**gen, "actual_max_new_tokens": limit},
                         "generation_fingerprint": fingerprint(metadata),

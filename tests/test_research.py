@@ -122,6 +122,27 @@ def test_no_reasoning_persisted():
     assert "identity_marker" in clean_response("I am Qwen", [r"\bqwen\b"])[1]
 
 
+def test_response_framing_and_identity():
+    from teacher_attr.quality import clean_response, describe
+
+    names = [r"\b(google|qwen|openai)\b"]
+    assert clean_response("Angular is developed by Google.", names)[1] == []
+    assert clean_response("Angular — фреймворк от Google.", names)[1] == []
+    assert "identity_marker" in clean_response("I was developed by OpenAI.", names)[1]
+    assert "identity_marker" in clean_response("I'm Qwen, an assistant.", names)[1]
+    assert clean_response("Answer.<|im_end|>", [], ("<|im_end|>",)) == ("Answer.", [])
+    assert clean_response("Answer.<|im_end|><|pad|>", [], ("<|im_end|>", "<|pad|>")) == (
+        "Answer.",
+        [],
+    )
+    assert "template_markup" in clean_response("A<|im_end|>B", [], ("<|im_end|>",))[1]
+    assert "template_markup" in clean_response("Answer.<|unknown|>", [], ("<|im_end|>",))[1]
+    assert "empty" in clean_response("<|im_end|>", [], ("<|im_end|>",))[1]
+    stats = describe([{"response": "", "quality_flags": ["empty"]}], [])
+    assert stats["invalid_rate"] == 1
+    assert stats["flag_counts"] == {"empty": 1}
+
+
 def test_research_pools_and_variants(research_config, tmp_path):
     from teacher_attr.experiments import create_variant
     from teacher_attr.prompts import prepare, verify_prompts
