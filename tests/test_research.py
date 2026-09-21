@@ -29,6 +29,7 @@ def research_config(config, tiny_models, tmp_path):
         **config["generation"],
         "temperature": 0.7,
         "batch_size": 2,
+        "min_new_tokens": 1,
         "top_k": 0,
         "repetition_penalty": 1.0,
     }

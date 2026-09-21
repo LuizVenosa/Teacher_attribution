@@ -174,6 +174,16 @@ def generate(cfg: dict, role: str, model_id: str, split: str) -> dict:
         else gen["temperature"]
     )
     sampling = {"do_sample": temperature > 0}
+    if "min_new_tokens" in gen:
+        minimum = gen["min_new_tokens"]
+        limits = [gen["max_new_tokens"], *gen.get("task_max_new_tokens", {}).values()]
+        if (
+            isinstance(minimum, bool)
+            or not isinstance(minimum, int)
+            or not 0 <= minimum <= min(limits)
+        ):
+            raise ValueError("min_new_tokens must be an integer between zero and every output cap")
+        sampling["min_new_tokens"] = minimum
     if "research" in cfg:
         sampling.update(
             top_k=gen["top_k"],

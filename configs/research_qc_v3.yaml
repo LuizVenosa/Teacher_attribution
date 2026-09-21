@@ -1,0 +1,237 @@
+run_dir: ../runs/controlled_qc_v3
+seed: 13
+protocol: controlled_seen_students
+teachers:
+  qwen:
+    hf_name: Qwen/Qwen3.5-9B
+    revision: c202236235762e1c871ad0ccb60c8ee5ba337b9a
+    prompt_format: chat
+    model_class: AutoModelForImageTextToText
+    chat_kwargs:
+      enable_thinking: false
+  ministral:
+    hf_name: mistralai/Ministral-3-8B-Instruct-2512-BF16
+    revision: f6fae9795746f63c9be8344932f01275f3c63734
+    prompt_format: chat
+    model_class: AutoModelForImageTextToText
+  gemma:
+    hf_name: google/gemma-4-12B-it
+    revision: 707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7
+    prompt_format: chat
+    model_class: AutoModelForMultimodalLM
+    chat_kwargs:
+      enable_thinking: false
+  granite:
+    hf_name: ibm-granite/granite-3.3-8b-instruct
+    revision: 51dd4bc2ade4059a6bd87649d68aa11e4fb2529b
+    prompt_format: chat
+    model_class: AutoModelForCausalLM
+    chat_kwargs:
+      thinking: false
+generation:
+  max_input_tokens: 1024
+  max_new_tokens: 192
+  temperature: 0.7
+  top_p: 0.9
+  top_k: 0
+  repetition_penalty: 1.0
+  dtype: bfloat16
+  batch_size: 4
+  attention: sdpa
+  controlled_length: true
+  task_max_new_tokens:
+    instruction: 192
+    summarization: 320
+    qa: 128
+    safety: 160
+  system_instruction: Give only a concise final response. Do not identify your model
+    or provider. Do not include private reasoning or reasoning tags.
+  task_instructions:
+    instruction: Answer in 60–80 words.
+    summarization: Write a summary of approximately 80 words.
+    qa: Give a brief explanation and end with the final answer letter; use at most
+      60 words.
+    safety: Respond in 60–80 words. If declining, briefly explain and offer a safe
+      alternative.
+  identity_patterns:
+  - \b(qwen|alibaba|ministral|mistral|gemma|google|granite|ibm|olmo|allenai|openai|chatgpt)\b
+  min_new_tokens: 1
+encoder:
+  hf_name: answerdotai/ModernBERT-base
+  revision: 8949b909ec900327062f0ebf497f51aef5e6f0c8
+  input_mode: prompt_response
+  max_length: 512
+  max_prompt_tokens: 128
+  projection_dim: 128
+  objective: joint
+  temperature: 0.05
+  classification_weight: 0.2
+  epochs: 10
+  batch_size: 4
+  learning_rate: 2.0e-05
+  weight_decay: 0.01
+  patience: 4
+  precision: bfloat16
+  gradient_accumulation: 4
+  gradient_checkpointing: true
+  negatives: same_prompt
+  representation: semantic
+  structure_layer: 4
+evaluation:
+  set_sizes:
+  - 1
+  - 2
+  - 5
+  - 10
+  - 20
+  - 50
+  set_repeats: 200
+  bootstrap_repeats: 1000
+  logreg_c:
+  - 0.1
+  - 1.0
+  - 10.0
+  perplexity_control: true
+  bertscore_model: roberta-base
+  bertscore_layers: 10
+  pos_model: en_core_web_sm
+  generic_encoder:
+    hf_name: sentence-transformers/all-MiniLM-L6-v2
+    revision: 1110a243fdf4706b3f48f1d95db1a4f5529b4d41
+  shortcut_phrases:
+  - as an ai
+  - language model
+  - i cannot
+  - i am unable
+  - certainly
+  - here is
+  - in conclusion
+research:
+  additional_ft_epochs:
+    light: 1
+    moderate: 3
+  student:
+    hf_name: allenai/OLMo-2-0425-1B
+    revision: a1847dff35000b4271fa70afc5db10fd29fedbdf
+    prompt_format: completion
+  amounts:
+  - 500
+  - 1000
+  - 2500
+  - 5000
+  student_seeds:
+  - 13
+  - 42
+  - 71
+  primary_amount: 5000
+  primary_seed: 13
+  max_input_chars: 2000
+  scan_limit: 100000
+  sources:
+    tulu3:
+      hf_name: allenai/tulu-3-sft-mixture
+      revision: b14afda60f1bbebe55d5d2fa1e4df5042f97f8be
+      subset: null
+      split: train
+      format: messages
+      task: instruction
+      counts:
+        distill_train: 2000
+        distill_val: 50
+        train: 200
+        val: 100
+        test: 200
+    cnn_dailymail:
+      hf_name: abisee/cnn_dailymail
+      revision: 96df5e686bee6baa90b8bee7c28b81fa3fa6223d
+      subset: 3.0.0
+      split: train
+      format: standard
+      task: summarization
+      counts:
+        distill_train: 750
+        distill_val: 50
+        train: 200
+        val: 100
+        test: 200
+    pubmed:
+      hf_name: ccdv/pubmed-summarization
+      revision: 6b30a2cae59b11ed77cb19959bffccbbd18e1106
+      subset: section
+      split: train
+      format: standard
+      task: summarization
+      counts:
+        distill_train: 750
+        distill_val: 50
+        train: 200
+        val: 100
+        test: 200
+    commonsenseqa:
+      hf_name: tau/commonsense_qa
+      revision: 94630fe30dad47192a8546eb75f094926d47e155
+      subset: null
+      split: train
+      format: standard
+      task: qa
+      counts:
+        distill_train: 500
+        distill_val: 50
+        train: 200
+        val: 100
+        test: 200
+    openbookqa:
+      hf_name: allenai/openbookqa
+      revision: 388097ea7776314e93a529163e0fea805b8a6454
+      subset: main
+      split: train
+      format: standard
+      task: qa
+      counts:
+        distill_train: 500
+        distill_val: 50
+        train: 200
+        val: 100
+        test: 200
+    safety:
+      hf_name: Anthropic/hh-rlhf
+      revision: 09be8c5bbc57cb3887f3a9732ad6aa7ec602a1fa
+      subset: null
+      split: train
+      format: human_assistant
+      task: safety
+      counts:
+        distill_train: 500
+        distill_val: 50
+        train: 200
+        val: 100
+        test: 200
+      data_dir: harmless-base
+  training:
+    precision: bfloat16
+    max_length: 1024
+    epochs: 3
+    learning_rate: 2.0e-05
+    microbatch: 4
+    gradient_accumulation: 8
+    gradient_checkpointing: true
+    attention: sdpa
+    tf32: true
+    fused_adamw: true
+    packing: false
+    weight_decay: 0.01
+    max_grad_norm: 1.0
+    log_every: 10
+  quality:
+    max_invalid_rate: 0.0
+    max_truncated_rate: 0.1
+    max_length_ratio: 1.5
+    refusal_patterns:
+    - \b(cannot|can\x27t|unable to|sorry)\b
+  sets:
+    hidden_dim: 128
+    epochs: 20
+    learning_rate: 0.001
+    batch_size: 32
+    train_sets_per_student: 200
+    temperature: 0.1
