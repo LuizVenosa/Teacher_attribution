@@ -77,7 +77,21 @@ def describe(rows: list[dict], refusal_patterns: list[str]) -> dict:
     }
 
 
-def quality_control(cfg: dict, split: str = "distill_train") -> dict:
+def apply_length_exception(report: dict, accept: bool) -> None:
+    report["strict_passed"] = not report["flags"]
+    report["accepted_flags"] = [
+        flag
+        for flag in report["flags"]
+        if accept and flag.endswith(": teacher response length imbalance")
+    ]
+    report["blocking_flags"] = [f for f in report["flags"] if f not in report["accepted_flags"]]
+    report["passed"] = not report["blocking_flags"]
+    report["length_exception_requested"] = accept
+
+
+def quality_control(
+    cfg: dict, split: str = "distill_train", accept_length_imbalance: bool = False
+) -> dict:
     root = initialize_run(cfg)
     settings = cfg["research"]["quality"]
     expected = {r["prompt_id"] for r in load_jsonl(root / "prompts" / f"{split}.jsonl")}
@@ -103,7 +117,7 @@ def quality_control(cfg: dict, split: str = "distill_train") -> dict:
         lengths = [s["by_task"][task]["mean_words"] for s in report["teachers"].values()]
         if max(lengths) / max(min(lengths), 1) > settings["max_length_ratio"]:
             report["flags"].append(f"{task}: teacher response length imbalance")
-    report["passed"] = not report["flags"]
+    apply_length_exception(report, accept_length_imbalance)
     out = root / "quality" / split
     save_json(out / "metrics.json", report)
     import matplotlib

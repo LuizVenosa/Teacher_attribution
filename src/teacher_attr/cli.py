@@ -43,6 +43,11 @@ def main(argv: list[str] | None = None) -> None:
     evaluate.add_argument("--name", default="evaluation")
     qc = commands.add_parser("qc", help="Audit all teachers before student training")
     qc.add_argument(
+        "--accept-length-imbalance",
+        action="store_true",
+        help="Accept length imbalance for this split; invalid/truncated failures still block",
+    )
+    qc.add_argument(
         "--split", default="distill_train", choices=["distill_train", "distill_val", *SPLITS]
     )
     distill = commands.add_parser("distill", help="Full-model SFT from one cached teacher")
@@ -168,7 +173,7 @@ def main(argv: list[str] | None = None) -> None:
     elif args.command == "qc":
         from teacher_attr.quality import quality_control
 
-        result = quality_control(cfg, args.split)
+        result = quality_control(cfg, args.split, args.accept_length_imbalance)
     elif args.command == "distill":
         from teacher_attr.distillation import train_student
 

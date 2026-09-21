@@ -11,6 +11,24 @@ from teacher_attr.io import load_jsonl, write_jsonl
 from teacher_attr.research import POOLS, nested_ids, user_prompt
 
 
+def test_length_exception_preserves_hard_failures():
+    from teacher_attr.quality import apply_length_exception
+
+    length = "instruction: teacher response length imbalance"
+    invalid = "ministral: invalid/truncated response threshold exceeded"
+    report = {"flags": [length, invalid]}
+    apply_length_exception(report, True)
+    assert not report["passed"]
+    assert report["blocking_flags"] == [invalid]
+    assert report["flags"] == [length, invalid]
+    report = {"flags": [length]}
+    apply_length_exception(report, True)
+    assert report["passed"] and not report["strict_passed"]
+    assert report["accepted_flags"] == [length]
+    apply_length_exception(report, False)
+    assert not report["passed"]
+
+
 @pytest.fixture
 def research_config(config, tiny_models, tmp_path):
     raw = yaml.safe_load((Path(__file__).parents[1] / "configs" / "research.yaml").read_text())
