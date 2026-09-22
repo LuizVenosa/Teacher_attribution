@@ -13,6 +13,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--config", default="configs/research.yaml")
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("prepare", help="Build and audit disjoint prompt splits")
+    commands.add_parser("audit-tokens", help="Audit every prompt pool using tokenizers only")
     pre = commands.add_parser("preflight", help="Check model/tokenizer access without weights")
     pre.add_argument("--cache-dir")
     gen = commands.add_parser(
@@ -121,6 +122,10 @@ def main(argv: list[str] | None = None) -> None:
         from teacher_attr.experiments import preflight
 
         result = preflight(cfg, args.cache_dir)
+    elif args.command == "audit-tokens":
+        from teacher_attr.token_audit import audit_token_budgets
+
+        result = audit_token_budgets(cfg)
     elif args.command == "generate":
         from teacher_attr.generation import generate
 
