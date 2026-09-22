@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from teacher_attr.context import context_limit
+
 from teacher_attr.distillation import controlled_text, student_prompt
 from teacher_attr.generation import output_path, read_outputs, render_prompt
 from teacher_attr.io import load_jsonl
@@ -50,11 +52,7 @@ def audit_token_budgets(cfg: dict) -> dict:
         kwargs = {"revision": model["revision"], "trust_remote_code": False}
         tokenizer = AutoTokenizer.from_pretrained(model["hf_name"], **kwargs)
         config = AutoConfig.from_pretrained(model["hf_name"], **kwargs)
-        text_config = getattr(config, "text_config", config)
-        limits = [getattr(text_config, k, None) for k in ("max_position_embeddings", "n_positions")]
-        limits.append(tokenizer.model_max_length)
-        # Same effective context convention as generation.py.
-        context = min((n for n in limits if isinstance(n, int) and 0 < n < 100000), default=2048)
+        context = context_limit(config, tokenizer)
         budget = min(
             gen["max_input_tokens"], context - (0 if config.is_encoder_decoder else reserve)
         )

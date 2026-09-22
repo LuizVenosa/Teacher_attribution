@@ -6,6 +6,7 @@ from collections import Counter
 from pathlib import Path
 
 from teacher_attr.config import file_hash, fingerprint, initialize_run
+from teacher_attr.context import context_limit
 from teacher_attr.io import append_jsonl, load_jsonl, save_json
 from teacher_attr.prompts import verify_prompts
 
@@ -131,10 +132,7 @@ def generate(cfg: dict, role: str, model_id: str, split: str) -> dict:
         )
 
     rendered = [prepared_prompt(p) for p in prompts]
-    text_config = getattr(config, "text_config", config)
-    limits = [getattr(text_config, k, None) for k in ("max_position_embeddings", "n_positions")]
-    limits += [tokenizer.model_max_length]
-    context = min((n for n in limits if isinstance(n, int) and 0 < n < 100000), default=2048)
+    context = context_limit(config, tokenizer)
     budget = min(
         gen["max_input_tokens"],
         context

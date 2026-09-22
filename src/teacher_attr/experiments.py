@@ -8,6 +8,7 @@ import shlex
 from pathlib import Path
 
 from teacher_attr.config import file_hash, initialize_run, load_config
+from teacher_attr.context import context_limit
 from teacher_attr.io import load_jsonl, load_yaml, save_json, save_yaml, write_jsonl
 from teacher_attr.prompts import audit_splits, text_hash, verify_prompts
 
@@ -51,6 +52,7 @@ def preflight(cfg: dict, cache_dir: str | None = None) -> dict:
                 "model_type": config.model_type,
                 "resolved_revision": getattr(config, "_commit_hash", None),
                 "tokenizer_class": type(tokenizer).__name__,
+                "context_limit": context_limit(config, tokenizer),
             }
         except (OSError, ValueError, ImportError, AttributeError) as exc:
             results[name] = {"accessible": False, "error": str(exc)}
