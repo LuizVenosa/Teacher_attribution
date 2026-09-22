@@ -130,6 +130,13 @@ even if the old account has mail settings.
 
 ## Limits
 
+The batch launcher logs CPU-time soft/hard limits after environment activation.
+An inherited 600-second CPU limit can kill a GPU process with SIGXCPU despite a
+24-hour SLURM wall-time request. If the hard limit is unlimited, the launcher raises
+only the soft CPU limit to unlimited. If a finite hard limit prevents this, it
+stops before model loading and asks for a cluster-supported batch limit. It does
+not change hard limits, login-shell limits, or SLURM allocation limits.
+
 The historical 24-hour request is not a measured duration or verified current
 queue limit. Run a small, separate pilot configuration first and inspect memory,
 runtime and QC before using the full dataset. Generation resumes from its cache;

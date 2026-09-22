@@ -17,6 +17,7 @@ set -euo pipefail
 export PROJECT_ROOT="${PROJECT_ROOT:-${SLURM_SUBMIT_DIR:?Submit from the repository root}}"
 source "$PROJECT_ROOT/jobs/runtime_cache.sh"
 source "$PROJECT_ROOT/jobs/00_setup_env.sh"
+source "$PROJECT_ROOT/jobs/cpu_limit.sh"
 if [ "$#" -eq 0 ]; then
   echo "Usage: sbatch jobs/run.sbatch COMMAND [options]" >&2
   exit 2
