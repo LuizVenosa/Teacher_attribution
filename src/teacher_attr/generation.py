@@ -10,6 +10,28 @@ from teacher_attr.io import append_jsonl, load_jsonl, save_json
 from teacher_attr.prompts import verify_prompts
 
 
+def validate_resume_metadata(stored: dict, current: dict) -> None:
+    """A launcher-only Git commit must not invalidate identical generation settings."""
+
+    def comparable(metadata):
+        result = dict(metadata)
+        if "runtime" in result:
+            result["runtime"] = {
+                key: value for key, value in result["runtime"].items() if key != "git_commit"
+            }
+        return result
+
+    before, after = comparable(stored), comparable(current)
+    changed = sorted(
+        key for key in before.keys() | after.keys() if before.get(key) != after.get(key)
+    )
+    if changed:
+        raise ValueError(
+            f"Generation resume metadata changed: {', '.join(changed)}. "
+            "Restore the original settings/environment or use a new run."
+        )
+
+
 def output_path(root: Path, role: str, model_id: str, split: str) -> Path:
     return root / "outputs" / role / model_id / f"{split}.jsonl"
 
@@ -164,8 +186,15 @@ def generate(cfg: dict, role: str, model_id: str, split: str) -> dict:
 
         metadata["runtime"] = provenance()
     if meta_path.exists():
-        if json.loads(meta_path.read_text(encoding="utf-8")) != metadata:
-            raise ValueError("Resolved model revision changed; use a pinned revision and new run")
+        stored_metadata = json.loads(meta_path.read_text(encoding="utf-8"))
+        validate_resume_metadata(stored_metadata, metadata)
+        append_jsonl(
+            path.with_suffix(".resume.jsonl"),
+            [{"runtime": metadata.get("runtime"), "completed_rows": len(done)}],
+        )
+        # Existing rows hash the original manifest. Keep that identity on new rows,
+        # recording the actual resume runtime separately instead of rewriting history.
+        metadata = stored_metadata
     else:
         save_json(meta_path, metadata)
     temperature = (
