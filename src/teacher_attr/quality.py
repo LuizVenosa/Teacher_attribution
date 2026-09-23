@@ -93,13 +93,19 @@ def quality_control(
     cfg: dict, split: str = "distill_train", accept_length_imbalance: bool = False
 ) -> dict:
     root = initialize_run(cfg)
+    from teacher_attr.exclusions import training_exclusions
+
+    exclusions = training_exclusions(cfg) if split == "distill_train" else None
+    excluded = set(exclusions["prompt_ids"]) if exclusions else set()
     settings = cfg["research"]["quality"]
     expected = {r["prompt_id"] for r in load_jsonl(root / "prompts" / f"{split}.jsonl")}
     report = {"split": split, "teachers": {}, "hashes": {}, "passed": True, "flags": []}
+    report["training_exclusions"] = exclusions
     for teacher in cfg["teachers"]:
         rows = read_outputs(cfg, "teachers", teacher, split)
         if {r["prompt_id"] for r in rows} != expected:
             raise ValueError(f"Incomplete teacher outputs: {teacher}/{split}")
+        rows = [r for r in rows if r["prompt_id"] not in excluded]
         stats = describe(rows, settings["refusal_patterns"])
         stats["by_task"] = {
             task: describe([r for r in rows if r["task"] == task], settings["refusal_patterns"])

@@ -88,6 +88,14 @@ def audit_token_budgets(cfg: dict) -> dict:
                         report["student_training"][teacher][split] = {"status": "not_generated"}
                         continue
                     rows = read_outputs(cfg, "teachers", teacher, split)
+                    from teacher_attr.exclusions import training_exclusions
+
+                    exclusions = training_exclusions(cfg) if split == "distill_train" else None
+                    excluded = set(exclusions["prompt_ids"]) if exclusions else set()
+                    complete = {r["prompt_id"] for r in rows} == {
+                        r["prompt_id"] for r in pools[split]
+                    }
+                    rows = [r for r in rows if r["prompt_id"] not in excluded]
                     lengths = [
                         len(
                             tokenizer.encode(
@@ -101,7 +109,8 @@ def audit_token_budgets(cfg: dict) -> dict:
                     result = summarize_lengths(
                         rows, lengths, cfg["research"]["training"]["max_length"]
                     )
-                    result["complete"] = len(rows) == len(pools[split])
+                    result["complete"] = complete
+                    result["training_exclusions"] = exclusions
                     result["empty_targets"] = sum(not row["response"].strip() for row in rows)
                     result["over_model_context"] = sum(n > context for n in lengths)
                     report["student_training"][teacher][split] = result

@@ -109,9 +109,15 @@ def train_student(
     directory = root / "students" / name
     if directory.exists():
         raise ValueError(f"Student directory already exists: {directory}")
+    from teacher_attr.exclusions import training_exclusions
+
+    exclusions = training_exclusions(cfg)
+    excluded = set(exclusions["prompt_ids"]) if exclusions else set()
     hashes = {}
     for split in ("distill_train", "distill_val"):
         quality = json.loads((root / "quality" / split / "metrics.json").read_text())
+        if split == "distill_train" and quality.get("training_exclusions") != exclusions:
+            raise ValueError("Training exclusions changed after QC; rerun QC")
         if not quality["passed"]:
             raise ValueError("Teacher QC failed; inspect quality metrics before distillation")
         for t in cfg["teachers"]:
@@ -120,7 +126,9 @@ def train_student(
                 raise ValueError("Teacher outputs changed after QC")
         hashes[split] = quality["hashes"][teacher]
     rows = {s: read_outputs(cfg, "teachers", teacher, s) for s in hashes}
-    subset = nested_ids(cfg, amount)
+    subset = [pid for pid in nested_ids(cfg, amount) if pid not in excluded]
+    if not subset:
+        raise ValueError("No training examples remain after exclusions")
     index = {r["prompt_id"]: r for r in rows["distill_train"]}
     rows["distill_train"] = [index[pid] for pid in subset]
     if any(r.get("quality_flags") or not r["response"].strip() for rs in rows.values() for r in rs):
@@ -288,6 +296,8 @@ def train_student(
         "resolved_base_revision": getattr(model.config, "_commit_hash", None),
         "seed": seed,
         "amount": amount,
+        "effective_amount": len(subset),
+        "training_exclusions": exclusions,
         "configuration": train,
         "history": history,
         "prompt_ids": subset,

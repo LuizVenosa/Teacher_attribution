@@ -12,6 +12,9 @@ def main(argv: list[str] | None = None) -> None:
     )
     parser.add_argument("--config", default="configs/research.yaml")
     commands = parser.add_subparsers(dest="command", required=True)
+    exclude = commands.add_parser("exclude-training", help="Freeze matched SFT prompt exclusions")
+    exclude.add_argument("--prompt-id", action="append", required=True)
+    exclude.add_argument("--reason", required=True)
     commands.add_parser("prepare", help="Build and audit disjoint prompt splits")
     commands.add_parser("audit-tokens", help="Audit every prompt pool using tokenizers only")
     migration = commands.add_parser(
@@ -130,7 +133,11 @@ def main(argv: list[str] | None = None) -> None:
             )
         )
         return
-    if args.command == "prepare":
+    if args.command == "exclude-training":
+        from teacher_attr.exclusions import exclude_training_prompts
+
+        result = exclude_training_prompts(cfg, args.prompt_id, args.reason)
+    elif args.command == "prepare":
         from teacher_attr.prompts import prepare
 
         result = prepare(cfg)
