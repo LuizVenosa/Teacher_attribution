@@ -14,6 +14,12 @@ def main(argv: list[str] | None = None) -> None:
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("prepare", help="Build and audit disjoint prompt splits")
     commands.add_parser("audit-tokens", help="Audit every prompt pool using tokenizers only")
+    migration = commands.add_parser(
+        "migrate-budgets", help="Raise budgets in a new run and reuse complete teacher outputs"
+    )
+    migration.add_argument("--output", required=True)
+    migration.add_argument("--input-tokens", required=True, type=int)
+    migration.add_argument("--training-tokens", required=True, type=int)
     pre = commands.add_parser("preflight", help="Check model/tokenizer access without weights")
     pre.add_argument("--cache-dir")
     gen = commands.add_parser(
@@ -114,6 +120,16 @@ def main(argv: list[str] | None = None) -> None:
         print(json.dumps(create_variant(args.config, args.kind, args.value, args.output), indent=2))
         return
     cfg = load_config(args.config)
+    if args.command == "migrate-budgets":
+        from teacher_attr.budget_migration import migrate_budgets
+
+        print(
+            json.dumps(
+                migrate_budgets(args.config, args.output, args.input_tokens, args.training_tokens),
+                indent=2,
+            )
+        )
+        return
     if args.command == "prepare":
         from teacher_attr.prompts import prepare
 
