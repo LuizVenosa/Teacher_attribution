@@ -77,6 +77,17 @@ def verify_student(cfg: dict, name: str) -> dict:
     return manifest
 
 
+def training_batch_settings(settings: dict, microbatch: int | None = None) -> dict:
+    result = dict(settings)
+    if microbatch is not None:
+        effective = result["microbatch"] * result["gradient_accumulation"]
+        if microbatch < 1 or effective % microbatch:
+            raise ValueError("Microbatch must be a positive divisor of the effective batch size")
+        result["microbatch"] = microbatch
+        result["gradient_accumulation"] = effective // microbatch
+    return result
+
+
 def train_student(
     cfg: dict,
     teacher: str,
@@ -84,6 +95,7 @@ def train_student(
     amount: int | None = None,
     post_data: str | None = None,
     level: str | None = None,
+    microbatch: int | None = None,
 ) -> dict:
     import torch
     from torch.utils.data import DataLoader
@@ -133,7 +145,8 @@ def train_student(
     rows["distill_train"] = [index[pid] for pid in subset]
     if any(r.get("quality_flags") or not r["response"].strip() for rs in rows.values() for r in rs):
         raise ValueError("Invalid targets cannot be silently dropped from a controlled dataset")
-    train, base = dict(research["training"]), research["student"]
+    train = training_batch_settings(research["training"], microbatch)
+    base = research["student"]
     load_base, post_metadata = base, None
     if post_data:
         from teacher_attr.prompts import text_hash, verify_prompts

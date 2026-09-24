@@ -62,6 +62,10 @@ def main(argv: list[str] | None = None) -> None:
     )
     distill = commands.add_parser("distill", help="Full-model SFT from one cached teacher")
     distill.add_argument("--teacher", required=True)
+    distill.add_argument(
+        "--microbatch", type=int,
+        help="Override microbatch; adjust accumulation to preserve effective batch size",
+    )
     distill.add_argument("--seed", type=int)
     distill.add_argument("--amount", type=int)
     distill.add_argument("--post-data", help="Independent JSONL for additional fine-tuning")
@@ -206,7 +210,7 @@ def main(argv: list[str] | None = None) -> None:
         from teacher_attr.distillation import train_student
 
         result = train_student(
-            cfg, args.teacher, args.seed, args.amount, args.post_data, args.level
+            cfg, args.teacher, args.seed, args.amount, args.post_data, args.level, args.microbatch
         )
     elif args.command == "train-sets":
         from teacher_attr.sets import train_sets
