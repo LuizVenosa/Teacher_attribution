@@ -101,7 +101,9 @@ def perplexity_scores(splits: dict, labels: dict, cfg: dict):
     from torch.nn import functional as F
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
+    from teacher_attr.context import context_limit
     from teacher_attr.evaluation import fit_probe
+    from teacher_attr.perplexity import response_tokens
 
     base = cfg["research"]["student"]
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -114,14 +116,18 @@ def perplexity_scores(splits: dict, labels: dict, cfg: dict):
         .eval()
     )
     values = {}
-    limit = cfg["research"]["training"]["max_length"]
+    limit = min(cfg["research"]["training"]["max_length"], context_limit(model.config, tokenizer))
     with torch.inference_mode():
         for split, rows in splits.items():
             nlls = []
             for row in rows:
-                tokens = tokenizer(row["student_response"], return_tensors="pt").to(device)
-                if tokens["input_ids"].shape[1] < 2 or tokens["input_ids"].shape[1] > limit:
-                    raise ValueError("Perplexity control requires 2..max_length tokens")
+                ids = response_tokens(
+                    tokenizer,
+                    row["student_response"],
+                    limit,
+                    f"{split}/{row['student_id']}/{row['prompt_id']}",
+                )
+                tokens = {"input_ids": torch.tensor([ids], dtype=torch.long, device=device)}
                 logits = model(**tokens).logits[:, :-1].float()
                 target = tokens["input_ids"][:, 1:]
                 nlls.append(
@@ -135,5 +141,11 @@ def perplexity_scores(splits: dict, labels: dict, cfg: dict):
     return scores, {
         **selection,
         "feature": "mean response negative log likelihood (log perplexity)",
+        "scoring_version": 2,
+        "tokenization": "BOS (EOS fallback) + response; no appended EOS; score all response tokens",
+        "boundary_token_id": (
+            tokenizer.bos_token_id if tokenizer.bos_token_id is not None else tokenizer.eos_token_id
+        ),
+        "context_budget": limit,
         "model": base,
     }
