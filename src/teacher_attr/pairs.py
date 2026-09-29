@@ -13,8 +13,12 @@ def align(
     teachers: dict[str, list[dict]],
     students: dict[str, list[dict]],
     student_config: dict,
+    excluded: set[str] | None = None,
 ) -> list[dict]:
+    excluded = set() if excluded is None else excluded
     expected = {p["prompt_id"]: p for p in prompts}
+    if not excluded <= set(expected) or excluded == set(expected):
+        raise ValueError("Unknown exclusions or empty retained split")
     if len(expected) != len(prompts):
         raise ValueError("Duplicate prompt IDs")
     maps = {}
@@ -29,9 +33,9 @@ def align(
                     or row["split"] != expected[pid]["split"]
                 ):
                     raise ValueError(f"{name}/{pid}: prompt or split mismatch")
-                if not row["response"].strip():
+                if pid not in excluded and not row["response"].strip():
                     raise ValueError(f"{name}/{pid}: empty response; investigate generation")
-                if row.get("quality_flags"):
+                if pid not in excluded and row.get("quality_flags"):
                     raise ValueError(f"{name}/{pid}: flagged response; inspect generation QC")
                 if row.get("model_id") != name:
                     raise ValueError(f"{name}/{pid}: wrong model ID")
@@ -47,8 +51,25 @@ def align(
             },
         }
         for prompt in prompts
+        if prompt["prompt_id"] not in excluded
         for name in sorted(students)
     ]
+
+
+def attribution_exclusions(root):
+    path = root / "attribution_exclusions.json"
+    if not path.exists():
+        return None
+    record = json.loads(path.read_text(encoding="utf-8"))
+    if record.get("schema_version") != 1 or not record.get("reason", "").strip():
+        raise ValueError("Invalid attribution exclusion record")
+    if set(record["splits"]) != set(SPLITS):
+        raise ValueError("Exclusions must specify train, val, and test")
+    for split, ids in record["splits"].items():
+        expected = {r["prompt_id"] for r in load_jsonl(root / "prompts" / f"{split}.jsonl")}
+        if len(ids) != len(set(ids)) or not set(ids) < expected:
+            raise ValueError(f"Invalid exclusions for {split}")
+    return record
 
 
 def build(cfg: dict) -> dict:
@@ -57,6 +78,7 @@ def build(cfg: dict) -> dict:
     if (root / "pairs" / "manifest.json").exists():
         load_pairs(cfg)
         return json.loads((root / "pairs" / "manifest.json").read_text(encoding="utf-8"))
+    exclusions = attribution_exclusions(root)
     splits = {}
     outputs = {}
     for split in SPLITS:
@@ -71,6 +93,7 @@ def build(cfg: dict) -> dict:
             teacher_rows,
             student_rows,
             cfg["students"],
+            set(exclusions["splits"][split]) if exclusions else set(),
         )
         for role, rows in (("teachers", teacher_rows), ("students", student_rows)):
             for name in rows:
@@ -84,6 +107,7 @@ def build(cfg: dict) -> dict:
         hashes[split] = file_hash(path)
     result = {
         "schema_version": 2,
+        "attribution_exclusions": exclusions,
         "audit": audit,
         "sha256": hashes,
         "outputs_sha256": outputs,
@@ -98,6 +122,8 @@ def load_pairs(cfg: dict) -> dict[str, list[dict]]:
     root = initialize_run(cfg)
     verify_prompts(root)
     manifest = json.loads((root / "pairs" / "manifest.json").read_text(encoding="utf-8"))
+    if manifest.get("attribution_exclusions") != attribution_exclusions(root):
+        raise ValueError("Attribution exclusions changed after build")
     if manifest["teacher_ids"] != list(cfg["teachers"]):
         raise ValueError("Teacher order changed")
     for relative, digest in manifest["outputs_sha256"].items():
