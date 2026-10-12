@@ -51,6 +51,20 @@ def main(argv: list[str] | None = None) -> None:
         "--frozen", action="store_true", help="Include pretrained MiniLM controls"
     )
     evaluate.add_argument("--name", default="evaluation")
+    paper = commands.add_parser(
+        "evaluate-paper", help="Teacher-only paper-inspired transfer baselines"
+    )
+    paper.add_argument("--name", default="paper_v1")
+    paper.add_argument(
+        "--methods",
+        nargs="+",
+        default=["word_ngram", "pos", "bow"],
+        choices=["word_ngram", "pos", "bow", "bertscore", "likelihood"],
+    )
+    paper.add_argument("--scope", choices=["per_dataset", "pooled"], default="per_dataset")
+    paper.add_argument("--teacher", help="One candidate teacher per likelihood job")
+    paper.add_argument("--collect", action="store_true", help="Summarize cached methods only")
+    paper.add_argument("--primary", help="Existing student-supervised evaluation directory")
     qc = commands.add_parser("qc", help="Audit all teachers before student training")
     qc.add_argument(
         "--accept-length-imbalance",
@@ -63,7 +77,8 @@ def main(argv: list[str] | None = None) -> None:
     distill = commands.add_parser("distill", help="Full-model SFT from one cached teacher")
     distill.add_argument("--teacher", required=True)
     distill.add_argument(
-        "--microbatch", type=int,
+        "--microbatch",
+        type=int,
         help="Override microbatch; adjust accumulation to preserve effective batch size",
     )
     distill.add_argument("--seed", type=int)
@@ -202,6 +217,12 @@ def main(argv: list[str] | None = None) -> None:
         from teacher_attr.evaluation import evaluate
 
         result = evaluate(cfg, args.checkpoint, args.frozen, args.name, args.reference_config)
+    elif args.command == "evaluate-paper":
+        from teacher_attr.paper_evaluation import evaluate_paper
+
+        result = evaluate_paper(
+            cfg, args.methods, args.name, args.scope, args.teacher, args.collect, args.primary
+        )
     elif args.command == "qc":
         from teacher_attr.quality import quality_control
 

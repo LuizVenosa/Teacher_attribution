@@ -16,6 +16,26 @@
 set -euo pipefail
 export PROJECT_ROOT="${PROJECT_ROOT:-${SLURM_SUBMIT_DIR:?Submit from the repository root}}"
 source "$PROJECT_ROOT/jobs/runtime_cache.sh"
+# Only this job's mktemp directory is disposable. Do not remove shared/home caches.
+_owned_runtime_cache=""
+if [[ "$MODEL_CACHE_MODE" == runtime ]]; then
+  _owned_runtime_cache="$CACHE_ROOT"
+fi
+cleanup_runtime_cache() {
+  if [[ -n "$_owned_runtime_cache" && -d "$_owned_runtime_cache" &&
+        ! -L "$_owned_runtime_cache" && -O "$_owned_runtime_cache" &&
+        "$(realpath "$_owned_runtime_cache")" == "$_owned_runtime_cache" ]]; then
+    case "$(basename "$_owned_runtime_cache")" in
+      teacher-attr-"${SLURM_JOB_ID:-manual}"-*)
+        echo "Removing this job's temporary cache: $_owned_runtime_cache"
+        rm -rf -- "$_owned_runtime_cache"
+        ;;
+    esac
+  fi
+}
+trap cleanup_runtime_cache EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
 source "$PROJECT_ROOT/jobs/00_setup_env.sh"
 source "$PROJECT_ROOT/jobs/cpu_limit.sh"
 if [ "$#" -eq 0 ]; then
@@ -41,4 +61,5 @@ if not torch.cuda.is_bf16_supported():
 print(f"GPU: {torch.cuda.get_device_name(0)}; torch={torch.__version__}; CUDA={torch.version.cuda}")
 PY
 fi
-exec python -m teacher_attr --config "${CONFIG:-configs/research.yaml}" "$@"
+# Keep the shell alive so its EXIT trap runs on success or a Python failure.
+python -m teacher_attr --config "${CONFIG:-configs/research.yaml}" "$@"

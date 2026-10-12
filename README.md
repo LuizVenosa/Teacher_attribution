@@ -20,6 +20,11 @@ Use a CUDA-enabled PyTorch installation on the A100 host. Authenticate to Huggin
 
 See **[the execution guide](docs/implementation.md)** for the sequential commands, controls, optional experiments, and validation limits. All paths inside YAML resolve relative to that YAML file. Use a new run directory when changing its settings.
 
+For teacher-trained PoS/word classifiers, BoW and BERTScore matching, and per-candidate
+teacher likelihood, see **[the paper comparison guide](docs/paper_comparison.md)**.
+These use a separate teacher-to-student protocol and do not replace the primary
+student-supervised results.
+
 For the Bocconi A100 cluster, use **[the SLURM setup guide](docs/cluster.md)**. It restores the historical `stud` account/queue setup, prepares offline model caches, and submits individual stages with `scripts/submit_slurm.sh`.
 
 ## Prompt pools
