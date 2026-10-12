@@ -30,7 +30,15 @@ learning. A learned encoder trained only on teachers would be a separate experim
   and cosine against each candidate's response to the same test prompt.
 - BERTScore uses F1 matching, configured model and layer count (currently RoBERTa-base,
   layer 10), no IDF and no baseline rescaling. Its resolved Hub revision is frozen
-  before scoring. Tokenizer limits are audited and overflow fails without truncation.
+  before scoring. Tokenizer limits are audited and overflow fails by default.
+  `--bertscore-overflow truncate` explicitly enables BERTScore's native right truncation
+  for both students and candidate references at 512 tokens including special tokens
+  (or a smaller model limit). Full responses and test membership stay unchanged.
+  This bounded-text baseline is labeled in the summary and CSV, and
+  `bertscore_token_audit.json` records every overlong occurrence and affected row.
+  The policy is frozen for BERTScore before scoring starts; a failed strict length
+  audit can be retried with truncation under the same evaluation name. Completed
+  controls are reused, while completed BERTScore scores cannot change policy.
 - Candidate likelihood scores each student response under each teacher, response-only
   with BOS (EOS fallback), no chat/prompt conditioning and no appended EOS. Only response
   tokens contribute to the score. Select the highest negative mean token NLL. The
@@ -64,7 +72,7 @@ REQUIRE_GPU=0 bash scripts/submit_slurm.sh \
 
 # Next job: BERTScore. Existing methods are collected without recomputing them.
 bash scripts/submit_slurm.sh --job-name=paper-bertscore \
-  -- evaluate-paper --name paper_v1 --methods bertscore
+  -- evaluate-paper --name paper_v1 --methods bertscore --bertscore-overflow truncate
 
 # Run individually, sequentially; each job loads only its selected candidate.
 bash scripts/submit_slurm.sh --job-name=paper-likelihood-qwen \

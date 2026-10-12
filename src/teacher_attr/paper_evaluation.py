@@ -41,6 +41,10 @@ def load_scores(out, name, shape):
     scores = np.load(path, allow_pickle=False)
     if scores.shape != shape or not np.isfinite(scores).all():
         raise ValueError(f"Invalid stored method scores: {name}")
+    audit_hash = record["selection"].get("token_audit_sha256")
+    if name == "bertscore" and audit_hash:
+        if file_hash(out / "bertscore_token_audit.json") != audit_hash:
+            raise ValueError("Stored BERTScore token audit changed")
     return scores, record["selection"]
 
 
@@ -132,11 +136,14 @@ def evaluate_paper(
     teacher=None,
     collect=False,
     primary=None,
+    bertscore_overflow="error",
 ):
     if not name or any(c not in "abcdefghijklmnopqrstuvwxyz0123456789_-" for c in name):
         raise ValueError("Evaluation name must be a safe lowercase identifier")
     if scope not in ("pooled", "per_dataset") or not set(methods) <= set(METHODS):
         raise ValueError("Unknown scope or method")
+    if bertscore_overflow not in ("error", "truncate"):
+        raise ValueError("Unknown BERTScore overflow policy")
     if "likelihood" in methods and not collect and teacher not in cfg["teachers"]:
         raise ValueError("Select one candidate with --teacher for a likelihood job")
     root = initialize_run(cfg)
@@ -173,7 +180,14 @@ def evaluate_paper(
             if method == "likelihood":
                 teacher_likelihood(cfg, splits["test"], teacher, out)
                 continue
-            if load_scores(out, method, shape) is not None:
+            cached = load_scores(out, method, shape)
+            if cached is not None:
+                if method == "bertscore" and (
+                    cached[1].get("overflow_policy", "error") != bertscore_overflow
+                ):
+                    raise ValueError(
+                        "Cached BERTScore uses another overflow policy; choose a new --name"
+                    )
                 print(f"Using verified cached method: {method}", flush=True)
                 continue
             print(f"Running paper method: {method}", flush=True)
@@ -194,7 +208,9 @@ def evaluate_paper(
                     "features": "unigram counts cosine; vocabulary fit on teacher training only"
                 }
             else:
-                scores, selection = bertscore_matching(cfg, splits["test"], teachers, out)
+                scores, selection = bertscore_matching(
+                    cfg, splits["test"], teachers, out, overflow=bertscore_overflow
+                )
             save_scores(out, method, scores, selection)
 
     all_methods = {}
@@ -271,16 +287,50 @@ def evaluate_paper(
     write_jsonl(out / "support_sets.jsonl", supports)
     with (out / "summary.csv").open("w", newline="", encoding="utf-8") as stream:
         writer = csv.writer(stream)
-        writer.writerow(["method", "dataset", "accuracy", "macro_f1", "num_rows"])
+        writer.writerow(
+            [
+                "method",
+                "dataset",
+                "accuracy",
+                "macro_f1",
+                "num_rows",
+                "overflow_policy",
+                "max_tokens",
+            ]
+        )
         for method, result in results.items():
+            selection = result["selection"]
             for dataset, value in [("all", result), *result["by_dataset"].items()]:
                 writer.writerow(
-                    [method, dataset, value["accuracy"], value["macro_f1"], value["num_rows"]]
+                    [
+                        method,
+                        dataset,
+                        value["accuracy"],
+                        value["macro_f1"],
+                        value["num_rows"],
+                        selection.get("overflow_policy", ""),
+                        selection.get("max_tokens", ""),
+                    ]
                 )
     lines = ["| Method | Accuracy | 95% prompt CI |", "|---|---:|---:|"]
     for method, result in results.items():
         lo, hi = result["accuracy_ci95"]
-        lines.append(f"| {method} | {result['accuracy']:.2%} | {lo:.2%}–{hi:.2%} |")
+        label = method
+        selection = result["selection"]
+        if method == "bertscore" and selection.get("overflow_policy") == "truncate":
+            label += f" (truncate at {selection['max_tokens']} tokens)"
+        lines.append(f"| {label} | {result['accuracy']:.2%} | {lo:.2%}–{hi:.2%} |")
+    if "bertscore" in results:
+        selection = results["bertscore"]["selection"]
+        if selection.get("overflow_policy") == "truncate":
+            lines.extend(
+                [
+                    "",
+                    f"BERTScore: {selection['overflow_text_occurrences']} text occurrences "
+                    f"in {selection['affected_test_rows']} test rows were right-truncated. "
+                    "Full responses and the test set are unchanged.",
+                ]
+            )
     (out / "summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     return {
         "output": str(out),

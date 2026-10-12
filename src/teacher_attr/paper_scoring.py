@@ -141,7 +141,9 @@ def teacher_likelihood(cfg, rows, teacher, out):
     return values, saved
 
 
-def bertscore_matching(cfg, rows, teachers, out):
+def bertscore_matching(cfg, rows, teachers, out, overflow="error"):
+    if overflow not in ("error", "truncate"):
+        raise ValueError("Unknown BERTScore overflow policy")
     import torch
     from bert_score import BERTScorer
     from huggingface_hub import HfApi, snapshot_download
@@ -154,6 +156,8 @@ def bertscore_matching(cfg, rows, teachers, out):
         record = json.loads(model_manifest.read_text())
         if record["model"] != model_name or record["layers"] != layers:
             raise ValueError("BERTScore configuration changed")
+        if record.get("overflow_policy", overflow) != overflow:
+            raise ValueError("BERTScore overflow policy is frozen; choose a new evaluation name")
     else:
         revision = HfApi().model_info(model_name).sha
         record = {"model": model_name, "revision": revision, "layers": layers}
@@ -165,23 +169,56 @@ def bertscore_matching(cfg, rows, teachers, out):
     )
     tokenizer = AutoTokenizer.from_pretrained(local, local_files_only=True, use_fast=False)
     config = AutoConfig.from_pretrained(local, local_files_only=True)
-    # BERTScore's RoBERTa tokenization caps at 512; reject instead of silently truncating.
+    # Match BERTScore's tokenization, auditing full lengths before any clipping.
     limit = min(512, context_limit(config, tokenizer))
     prefix = (
         {"add_prefix_space": True}
         if isinstance(tokenizer, (GPT2Tokenizer, RobertaTokenizer))
         else {}
     )
+    overlong, longest = [], 0
     for index, row in enumerate(rows):
-        for text in [row["student_response"], *row["teacher_responses"].values()]:
+        texts = [("student", row["student_response"])] + [
+            (f"teacher:{teacher}", row["teacher_responses"][teacher]) for teacher in teachers
+        ]
+        for source, text in texts:
             length = len(
                 tokenizer.encode(text.strip(), add_special_tokens=True, truncation=False, **prefix)
             )
+            longest = max(longest, length)
             if length > limit:
-                raise ValueError(
-                    f"BERTScore row {index}/{row['prompt_id']} needs {length} tokens; "
-                    f"limit {limit}. No truncation applied."
+                overlong.append(
+                    {
+                        "row_index": index,
+                        "prompt_id": row["prompt_id"],
+                        "student_id": row["student_id"],
+                        "source": source,
+                        "original_tokens": length,
+                        "tokens_if_truncated": limit,
+                    }
                 )
+    audit = {
+        "overflow_policy": overflow,
+        "max_tokens": limit,
+        "max_observed_tokens": longest,
+        "overflow_text_occurrences": len(overlong),
+        "affected_test_rows": len({r["row_index"] for r in overlong}),
+        "counting": (
+            "Per test row, one student text and one reference per candidate; references may repeat"
+        ),
+        "overlong": overlong,
+    }
+    save_json(out / "bertscore_token_audit.json", audit)
+    if overlong and overflow == "error":
+        first = overlong[0]
+        raise ValueError(
+            f"BERTScore row {first['row_index']}/{first['prompt_id']} needs "
+            f"{first['original_tokens']} tokens; limit {limit}. No truncation applied. "
+            "Use --bertscore-overflow truncate for an explicitly audited truncated baseline."
+        )
+    record.update(overflow_policy=overflow, truncation_side="right", max_tokens=limit)
+    # Freeze only once the length audit passes. A failed strict audit can be retried explicitly.
+    save_json(model_manifest, record)
     scorer = BERTScorer(
         model_type=str(Path(local)),
         num_layers=layers,
@@ -189,7 +226,12 @@ def bertscore_matching(cfg, rows, teachers, out):
         rescale_with_baseline=False,
         device="cuda" if torch.cuda.is_available() else "cpu",
         batch_size=8,
+        use_fast_tokenizer=False,
     )
+    # BERTScore's sent_encode reads this tokenizer's limit and truncates natively.
+    # Keep it equal to the audited budget, including special tokens.
+    scorer._tokenizer.model_max_length = limit
+    scorer._tokenizer.truncation_side = "right"
     scores = []
     for teacher in teachers:
         _, _, f1 = scorer.score(
@@ -198,5 +240,12 @@ def bertscore_matching(cfg, rows, teachers, out):
             batch_size=8,
         )
         scores.append(f1.cpu().numpy())
-    record.update(idf=False, rescale_with_baseline=False, max_tokens=limit, statistic="F1")
+    record.update(
+        idf=False,
+        rescale_with_baseline=False,
+        statistic="F1",
+        overflow_text_occurrences=len(overlong),
+        affected_test_rows=audit["affected_test_rows"],
+        token_audit_sha256=file_hash(out / "bertscore_token_audit.json"),
+    )
     return np.column_stack(scores), record

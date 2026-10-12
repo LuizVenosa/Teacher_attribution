@@ -250,23 +250,40 @@ def test_bertscore_pins_model_checks_lengths_and_limits_batch(paper_data, monkey
 
     cfg, splits, out = paper_data
     resolved = []
+    scored_lengths = []
 
     class Tokenizer:
         model_max_length = 512
 
         def encode(self, text, add_special_tokens, truncation, **kwargs):
-            assert truncation is False
-            assert kwargs == {"add_prefix_space": True}
-            return [0] * (len(text.split()) + 2)
+            assert kwargs.pop("add_prefix_space") is True
+            size = len(text.split()) + 2
+            if truncation:
+                assert self.truncation_side == "right"
+                size = min(size, kwargs.pop("max_length"))
+            assert not kwargs
+            return [0] * size
 
     class Scorer:
         def __init__(self, **kwargs):
             assert kwargs["num_layers"] == 10
             assert kwargs["idf"] is False
+            assert kwargs["use_fast_tokenizer"] is False
+            self._tokenizer = Tokenizer()
 
         def score(self, candidates, references, batch_size):
             assert batch_size == 8
             assert len(candidates) == len(references)
+            assert self._tokenizer.model_max_length == 16
+            for text in [*candidates, *references]:
+                ids = self._tokenizer.encode(
+                    text.strip(),
+                    add_special_tokens=True,
+                    add_prefix_space=True,
+                    truncation=True,
+                    max_length=self._tokenizer.model_max_length,
+                )
+                scored_lengths.append(len(ids))
             values = SimpleNamespace(
                 cpu=lambda: SimpleNamespace(numpy=lambda: np.ones(len(candidates)))
             )
@@ -305,7 +322,50 @@ def test_bertscore_pins_model_checks_lengths_and_limits_batch(paper_data, monkey
     assert record["revision"] == "f" * 40
     bertscore_matching(cfg, splits["test"], ["a", "b"], out)
     assert resolved == ["roberta-base"]  # Reuse frozen revision, no moving-head resolution.
+    bad_out = out / "overflow"
+    bad_out.mkdir()
     bad = copy.deepcopy(splits["test"])
     bad[0]["student_response"] = "long " * 20
+    bad[0]["teacher_responses"]["b"] = "long " * 30
     with pytest.raises(ValueError, match="No truncation"):
-        bertscore_matching(cfg, bad, ["a", "b"], out)
+        bertscore_matching(cfg, bad, ["a", "b"], bad_out)
+    assert "overflow_policy" not in json.loads((bad_out / "bertscore_model.json").read_text())
+    original = copy.deepcopy(bad)
+    _, truncated = bertscore_matching(cfg, bad, ["a", "b"], bad_out, overflow="truncate")
+    assert bad == original  # Never rewrite the source responses or remove rows.
+    assert truncated["overflow_text_occurrences"] == 2
+    assert truncated["affected_test_rows"] == 1
+    assert truncated["overflow_policy"] == "truncate"
+    assert max(scored_lengths) == 16
+    audit = json.loads((bad_out / "bertscore_token_audit.json").read_text())
+    assert audit["max_observed_tokens"] == 32
+    assert {r["source"] for r in audit["overlong"]} == {"student", "teacher:b"}
+    with pytest.raises(ValueError, match="policy is frozen"):
+        bertscore_matching(cfg, bad, ["a", "b"], bad_out)
+
+
+def test_cached_bertscore_policy_cannot_change_and_collection_labels_truncation(paper_data):
+    cfg, splits, root = paper_data
+    paper.evaluate_paper(cfg, methods=["bow"])
+    out = root / "evaluations/paper_v1"
+    audit = out / "bertscore_token_audit.json"
+    save_json(audit, {"overflow_text_occurrences": 3, "affected_test_rows": 2})
+    selection = {
+        "overflow_policy": "truncate",
+        "max_tokens": 512,
+        "overflow_text_occurrences": 3,
+        "affected_test_rows": 2,
+        "token_audit_sha256": file_hash(audit),
+    }
+    paper.save_scores(out, "bertscore", bow_scores(splits, ["a", "b"]), selection)
+    with pytest.raises(ValueError, match="another overflow policy"):
+        paper.evaluate_paper(cfg, methods=["bertscore"])
+    result = paper.evaluate_paper(cfg, methods=["bertscore"], bertscore_overflow="truncate")
+    assert result["methods"]["bertscore"] == 1
+    paper.evaluate_paper(cfg, collect=True)
+    summary = (out / "summary.md").read_text()
+    assert "truncate at 512 tokens" in summary
+    assert "3 text occurrences in 2 test rows" in summary
+    save_json(audit, {"overflow_text_occurrences": 0})
+    with pytest.raises(ValueError, match="token audit changed"):
+        paper.evaluate_paper(cfg, collect=True)

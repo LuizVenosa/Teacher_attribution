@@ -65,6 +65,12 @@ def main(argv: list[str] | None = None) -> None:
     paper.add_argument("--teacher", help="One candidate teacher per likelihood job")
     paper.add_argument("--collect", action="store_true", help="Summarize cached methods only")
     paper.add_argument("--primary", help="Existing student-supervised evaluation directory")
+    paper.add_argument(
+        "--bertscore-overflow",
+        choices=["error", "truncate"],
+        default="error",
+        help="Explicit BERTScore input policy; truncation is audited and recorded",
+    )
     qc = commands.add_parser("qc", help="Audit all teachers before student training")
     qc.add_argument(
         "--accept-length-imbalance",
@@ -221,7 +227,14 @@ def main(argv: list[str] | None = None) -> None:
         from teacher_attr.paper_evaluation import evaluate_paper
 
         result = evaluate_paper(
-            cfg, args.methods, args.name, args.scope, args.teacher, args.collect, args.primary
+            cfg,
+            args.methods,
+            args.name,
+            args.scope,
+            args.teacher,
+            args.collect,
+            args.primary,
+            bertscore_overflow=args.bertscore_overflow,
         )
     elif args.command == "qc":
         from teacher_attr.quality import quality_control
