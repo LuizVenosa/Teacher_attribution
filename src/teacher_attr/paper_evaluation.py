@@ -19,7 +19,8 @@ from teacher_attr.pairs import load_pairs
 from teacher_attr.paper_scoring import atomic_array
 from teacher_attr.research import provenance
 
-METHODS = ("word_ngram", "pos", "bow", "bertscore", "likelihood")
+SCORE_METHODS = ("word_ngram", "pos", "bow", "bertscore", "modernbert")
+METHODS = (*SCORE_METHODS, "likelihood")
 
 
 def save_scores(out, name, scores, selection):
@@ -128,6 +129,27 @@ def compare_primary(path, pair_hashes, rows, teachers, methods, cfg):
     }
 
 
+def compare_teacher_classifiers(rows, teachers, methods, cfg):
+    labels = np.array([teachers.index(row["true_teacher"]) for row in rows])
+    modernbert = methods["modernbert"][0].argmax(1) == labels
+    word_ngram = methods["word_ngram"][0].argmax(1) == labels
+    delta = modernbert.astype(float) - word_ngram
+    groups = grouped_indexes([row["source_dataset"] for row in rows])
+    groups["all"] = np.arange(len(rows))
+    return {
+        name: {
+            "accuracy_difference": float(delta[indexes].mean()),
+            "ci95": cluster_interval(
+                delta[indexes],
+                [rows[i]["prompt_id"] for i in indexes],
+                cfg["evaluation"]["bootstrap_repeats"],
+                cfg["seed"],
+            ),
+        }
+        for name, indexes in groups.items()
+    }
+
+
 def evaluate_paper(
     cfg,
     methods=("word_ngram", "pos", "bow"),
@@ -207,6 +229,10 @@ def evaluate_paper(
                 selection = {
                     "features": "unigram counts cosine; vocabulary fit on teacher training only"
                 }
+            elif method == "modernbert":
+                from teacher_attr.paper_modernbert import modernbert_scores
+
+                scores, selection = modernbert_scores(splits, teachers, cfg, scope)
             else:
                 scores, selection = bertscore_matching(
                     cfg, splits["test"], teachers, out, overflow=bertscore_overflow
@@ -214,7 +240,7 @@ def evaluate_paper(
             save_scores(out, method, scores, selection)
 
     all_methods = {}
-    for method in METHODS[:-1]:
+    for method in SCORE_METHODS:
         value = load_scores(out, method, shape)
         if value is not None:
             all_methods[method] = value
@@ -254,7 +280,9 @@ def evaluate_paper(
         **spec,
         "methods": results,
         "num_test_prompts": len({r["prompt_id"] for r in splits["test"]}),
-        "pending_methods": [m for m in METHODS[:-1] if m not in all_methods],
+        "pending_methods": [
+            m for m in SCORE_METHODS if m not in all_methods and (m != "modernbert" or m in methods)
+        ],
         "pending_likelihood_teachers": pending,
         "environment": provenance(),
         "interval_scope": "Prompt bootstrap conditional on observed student checkpoints",
@@ -266,6 +294,10 @@ def evaluate_paper(
             "teacher-validation tuning. No claim of beating the published table directly."
         ),
     }
+    comparison = None
+    if {"modernbert", "word_ngram"} <= all_methods.keys():
+        comparison = compare_teacher_classifiers(splits["test"], teachers, all_methods, cfg)
+        report["modernbert_vs_teacher_word_ngram"] = comparison
     if primary:
         report["comparison_to_student_supervised"] = compare_primary(
             primary, hashes, splits["test"], teachers, all_methods, cfg
@@ -331,6 +363,19 @@ def evaluate_paper(
                     "Full responses and the test set are unchanged.",
                 ]
             )
+    if comparison:
+        lines.extend(
+            [
+                "",
+                "| Dataset | ModernBERT minus teacher word n-grams | Paired 95% prompt CI |",
+                "|---|---:|---:|",
+            ]
+        )
+        for name in ("all", *sorted(set(comparison) - {"all"})):
+            difference = comparison[name]["accuracy_difference"]
+            lo, hi = comparison[name]["ci95"]
+            interval = f"{100 * lo:+.2f} to {100 * hi:+.2f} pp"
+            lines.append(f"| {name} | {100 * difference:+.2f} pp | {interval} |")
     (out / "summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     return {
         "output": str(out),

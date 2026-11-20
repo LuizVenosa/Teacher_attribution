@@ -144,6 +144,61 @@ def test_evaluation_resume_and_specification_guard(paper_data):
         paper.evaluate_paper(cfg, scope="pooled", collect=True)
 
 
+def test_modernbert_adds_paired_results_to_existing_run(paper_data, monkeypatch):
+    import sys
+    from types import SimpleNamespace
+
+    cfg, splits, root = paper_data
+    paper.evaluate_paper(cfg, methods=["word_ngram"])
+    out = root / "evaluations/paper_v1"
+    original = (out / "word_ngram.npy").read_bytes()
+    scores = bow_scores(splits, ["a", "b"])
+    scores[0] = scores[0, ::-1]
+    calls = []
+
+    def score(splits, teachers, cfg, scope):
+        calls.append(scope)
+        return scores, {"scope": scope}
+
+    monkeypatch.setitem(
+        sys.modules, "teacher_attr.paper_modernbert", SimpleNamespace(modernbert_scores=score)
+    )
+    paper.evaluate_paper(cfg, methods=["modernbert"])
+    paper.evaluate_paper(cfg, methods=["modernbert"])
+    assert calls == ["per_dataset"]
+    assert (out / "word_ngram.npy").read_bytes() == original
+    report = json.loads((out / "metrics.json").read_text())
+    comparison = report["modernbert_vs_teacher_word_ngram"]
+    assert comparison["all"]["accuracy_difference"] == -1 / 16
+    assert comparison["one"]["accuracy_difference"] == -1 / 8
+    assert comparison["two"]["accuracy_difference"] == 0
+    assert "Paired 95% prompt CI" in (out / "summary.md").read_text()
+
+
+def test_modernbert_fits_only_teacher_text(paper_data, config, tiny_models):
+    from teacher_attr.paper_modernbert import modernbert_scores
+
+    cfg, splits, _ = paper_data
+    cfg["encoder"] = {**config["encoder"], "epochs": 1}
+    for rows in splits.values():
+        for row in rows:
+            row["teacher_responses"] = {"a": "alpha response", "b": "beta response"}
+    scores, selection = modernbert_scores(splits, ["a", "b"], cfg, "per_dataset")
+    assert scores.shape == (16, 2)
+    assert np.isfinite(scores).all()
+    assert selection["encoder"]["input_mode"] == "response"
+    assert selection["groups"]["one"]["training_rows"] == 8
+    assert selection["groups"]["two"]["best_epoch"] == 1
+    for split in ("train", "val"):
+        for row in splits[split]:
+            row["student_response"] = "alpha beta alpha beta"
+    for rows in splits.values():
+        for row in rows:
+            row["true_teacher"] = "CANARY"
+    changed, _ = modernbert_scores(splits, ["a", "b"], cfg, "per_dataset")
+    np.testing.assert_allclose(changed, scores, atol=1e-6)
+
+
 def test_score_tampering_is_rejected(tmp_path):
     scores = np.array([[1.0, 0.0]])
     paper.save_scores(tmp_path, "bow", scores, {})

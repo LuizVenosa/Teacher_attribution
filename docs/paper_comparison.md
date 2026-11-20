@@ -5,9 +5,14 @@
 It is a paper-inspired comparison on our controlled data, **not an exact reproduction
 of their published numbers**. Our candidates, candidate count (four versus five),
 student training mixture, instruction/safety sources, and output controls differ.
-The current learned encoder used labeled student training data, so comparing its
-accuracy with teacher-only methods does not isolate the benefit of representation
-learning. A learned encoder trained only on teachers would be a separate experiment.
+The primary learned encoder used labeled student training data. The optional
+`modernbert` method fits a separate response-only classifier on the same teacher
+training and validation texts as word n-grams. It uses the run's pinned encoder,
+training settings, and seed. The best checkpoint is selected by teacher validation
+accuracy for each dataset (or once in pooled scope). Training history and student
+test truncation counts are saved in the result manifest. The paired comparison
+uses the same student rows and resamples whole prompts, conditional on the existing
+student checkpoints.
 
 ## Protocol
 
@@ -98,6 +103,21 @@ cat runs/research_budget_v1/evaluations/paper_v1/summary.md
 likelihood result appears only after all candidates complete. `summary.csv` includes
 overall and per-source results for publication tables; `predictions.jsonl` preserves
 aligned method scores. Collection may be repeated as methods finish.
+
+Add the optional teacher-trained ModernBERT comparison to an existing `paper_v1`
+directory with the same scope. Run this after the preceding jobs have finished.
+It reuses their saved scores and the current response files.
+
+```bash
+bash scripts/submit_slurm.sh --job-name=paper-modernbert \
+  -- evaluate-paper --name paper_v1 --scope per_dataset --methods modernbert \
+  --primary runs/research_budget_v1/evaluations/primary_v2
+```
+
+`summary.md` and `metrics.json` report the paired ModernBERT minus teacher-trained
+word n-gram accuracy difference overall and per dataset. A completed ModernBERT
+score file is reused on subsequent invocations. An interruption before it is
+saved requires rerunning this method.
 
 The SLURM wrapper now removes only its own `mktemp` model cache on ordinary exit,
 including Python failures. It does not remove pre-existing caches from other jobs.

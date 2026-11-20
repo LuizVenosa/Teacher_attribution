@@ -47,6 +47,19 @@ def batch_forward(model, batch, device, cfg, num_teachers):
     return loss, scores, labels
 
 
+def prepare_encoder(enc, num_teachers, seed, device):
+    set_seed(seed)
+    tokenizer = AutoTokenizer.from_pretrained(
+        enc["hf_name"], revision=enc["revision"], trust_remote_code=False
+    )
+    model = AttributionEncoder.pretrained(enc, num_teachers).to(device)
+    if enc.get("gradient_checkpointing"):
+        model.backbone.gradient_checkpointing_enable(
+            gradient_checkpointing_kwargs={"use_reentrant": False}
+        )
+    return model, tokenizer
+
+
 def train(
     cfg: dict,
     objective: str | None = None,
@@ -98,17 +111,9 @@ def train(
     if directory.exists():
         raise ValueError(f"Training directory already exists: {directory}. Use a new seed/run.")
     splits = load_pairs(cfg)
-    set_seed(seed)
     teachers = list(cfg["teachers"])
-    tokenizer = AutoTokenizer.from_pretrained(
-        enc["hf_name"], revision=enc["revision"], trust_remote_code=False
-    )
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = AttributionEncoder.pretrained(enc, len(teachers)).to(device)
-    if enc.get("gradient_checkpointing"):
-        model.backbone.gradient_checkpointing_enable(
-            gradient_checkpointing_kwargs={"use_reentrant": False}
-        )
+    model, tokenizer = prepare_encoder(enc, len(teachers), seed, device)
     collator = partial(collate, tokenizer=tokenizer, cfg=enc, teachers=teachers)
     loaders = {
         s: DataLoader(
@@ -116,13 +121,48 @@ def train(
         )
         for s in ("train", "val")
     }
-    optimizer = torch.optim.AdamW(
-        model.parameters(), lr=enc["learning_rate"], weight_decay=enc["weight_decay"]
-    )
     directory.mkdir(parents=True)
     tokenizer.save_pretrained(directory / "tokenizer")
     model.backbone.config.save_pretrained(directory / "backbone")
     data_hashes = {s: file_hash(root / "pairs" / f"{s}.jsonl") for s in splits}
+
+    def save_best(epoch):
+        payload = {
+            "schema_version": 2,
+            "model": model.state_dict(),
+            "encoder": enc,
+            "teacher_ids": teachers,
+            "pair_sha256": data_hashes,
+            "seed": seed,
+            "epoch": epoch,
+            "resolved_revision": getattr(model.backbone.config, "_commit_hash", None),
+        }
+        temporary = directory / "best.tmp"
+        torch.save(payload, temporary)
+        temporary.replace(directory / "best.pt")
+
+    summary = {}
+
+    def save_summary(progress):
+        summary.update(
+            encoder=enc,
+            seed=seed,
+            **progress,
+            pair_sha256=data_hashes,
+            environment=environment(),
+            baseline_sha256=file_hash(baseline) if baseline else None,
+            checkpoint=str(directory / "best.pt"),
+        )
+        save_json(directory / "training.json", summary)
+
+    fit_encoder(model, loaders, enc, device, len(teachers), save_best, save_summary)
+    return summary
+
+
+def fit_encoder(model, loaders, enc, device, num_teachers, save_best, save_summary=None):
+    optimizer = torch.optim.AdamW(
+        model.parameters(), lr=enc["learning_rate"], weight_decay=enc["weight_decay"]
+    )
     history, best, stale, best_epoch = [], -1.0, 0, 0
     for epoch in range(1, enc["epochs"] + 1):
         model.train()
@@ -136,7 +176,7 @@ def train(
                 dtype=torch.bfloat16,
                 enabled=enc.get("precision") == "bfloat16" and device == "cuda",
             ):
-                loss, _, labels = batch_forward(model, batch, device, enc, len(teachers))
+                loss, _, labels = batch_forward(model, batch, device, enc, num_teachers)
             if not torch.isfinite(loss):
                 raise FloatingPointError("Nonfinite training loss")
             (loss * len(labels)).backward()
@@ -155,7 +195,7 @@ def train(
         correct, val_n = 0, 0
         with torch.inference_mode():
             for batch in loaders["val"]:
-                _, scores, labels = batch_forward(model, batch, device, enc, len(teachers))
+                _, scores, labels = batch_forward(model, batch, device, enc, num_teachers)
                 correct += (scores.argmax(-1) == labels).sum().item()
                 val_n += len(labels)
         accuracy = correct / val_n
@@ -163,37 +203,20 @@ def train(
         print(f"epoch={epoch} loss={total / n:.4f} val_accuracy={accuracy:.4f}", flush=True)
         if accuracy > best:
             best, stale, best_epoch = accuracy, 0, epoch
-            payload = {
-                "schema_version": 2,
-                "model": model.state_dict(),
-                "encoder": enc,
-                "teacher_ids": teachers,
-                "pair_sha256": data_hashes,
-                "seed": seed,
-                "epoch": epoch,
-                "resolved_revision": getattr(model.backbone.config, "_commit_hash", None),
-            }
-            temporary = directory / "best.tmp"
-            torch.save(payload, temporary)
-            temporary.replace(directory / "best.pt")
+            save_best(epoch)
         else:
             stale += 1
-        summary = {
-            "encoder": enc,
-            "seed": seed,
+        progress = {
             "history": history,
             "best_epoch": best_epoch,
             "best_val_accuracy": best,
             "early_stopped": stale >= enc["patience"],
-            "pair_sha256": data_hashes,
-            "environment": environment(),
-            "baseline_sha256": file_hash(baseline) if baseline else None,
-            "checkpoint": str(directory / "best.pt"),
         }
-        save_json(directory / "training.json", summary)
+        if save_summary is not None:
+            save_summary(progress)
         if stale >= enc["patience"]:
             break
-    return summary
+    return progress
 
 
 def load_checkpoint(path: str | Path, cfg: dict, device: str):
