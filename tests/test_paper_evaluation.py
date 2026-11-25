@@ -175,6 +175,60 @@ def test_modernbert_adds_paired_results_to_existing_run(paper_data, monkeypatch)
     assert "Paired 95% prompt CI" in (out / "summary.md").read_text()
 
 
+def test_wtyt_ngram_uses_public_settings_and_compares_existing_baseline(paper_data, monkeypatch):
+    nltk = pytest.importorskip("nltk")
+    from nltk.tokenize import TreebankWordTokenizer
+
+    from teacher_attr.paper_baselines import wtyt_ngram_scores
+
+    cfg, splits, root = paper_data
+    seen = []
+    tokenizer = TreebankWordTokenizer()
+
+    def tokenize(text):
+        seen.append(text)
+        return tokenizer.tokenize(text)
+
+    monkeypatch.setattr(nltk, "word_tokenize", tokenize)
+    for rows in splits.values():
+        for row in rows:
+            row["teacher_responses"] = {
+                t: f"#### {text.upper()}!" for t, text in row["teacher_responses"].items()
+            }
+    paper.evaluate_paper(cfg, methods=["word_ngram"])
+    out = root / "evaluations/paper_v1"
+    original = (out / "word_ngram.npy").read_bytes()
+    result = paper.evaluate_paper(cfg, methods=["word_ngram_wtyt", "word_ngram_10k"])
+    assert result["methods"]["word_ngram_wtyt"] == 1.0
+    assert (out / "word_ngram.npy").read_bytes() == original
+    assert len(seen) == 48  # 16 teacher train, 16 teacher val, 16 student test.
+    assert all(
+        "####" not in text and text == text.lower() and "canary" not in text for text in seen
+    )
+    report = json.loads((out / "metrics.json").read_text())
+    selection = report["methods"]["word_ngram_wtyt"]["selection"]
+    assert selection["groups"]["one"]["max_features"] == 10000
+    assert selection["groups"]["one"]["vocabulary_size"] == 10
+    assert selection["groups"]["one"]["C"] == 1.0
+    change = report["word_ngram_wtyt_vs_teacher_word_ngram"]
+    assert set(change) == {"all", "one", "two"}
+    assert all(value["accuracy_difference"] == 0 for value in change.values())
+    cap_selection = report["methods"]["word_ngram_10k"]["selection"]["groups"]["one"]
+    assert cap_selection["max_features"] == 10000
+    assert cap_selection["vocabulary_size"] > selection["groups"]["one"]["vocabulary_size"]
+    assert report["word_ngram_10k_vs_teacher_word_ngram"]["all"]["accuracy_difference"] == 0
+    assert "WTYT public code minus teacher word n-grams" in (out / "summary.md").read_text()
+    scores, _ = wtyt_ngram_scores(
+        {
+            "train": ["red red apple!", "blue blue sky?"],
+            "val": ["red", "blue"],
+            "test": ["red red apple!", "red red apple?"],
+        },
+        {"train": [0, 1], "val": [0, 1]},
+    )
+    np.testing.assert_array_equal(scores[0], scores[1])
+
+
 def test_modernbert_fits_only_teacher_text(paper_data, config, tiny_models):
     from teacher_attr.paper_modernbert import modernbert_scores
 

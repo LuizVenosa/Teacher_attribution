@@ -19,7 +19,8 @@ from teacher_attr.pairs import load_pairs
 from teacher_attr.paper_scoring import atomic_array
 from teacher_attr.research import provenance
 
-SCORE_METHODS = ("word_ngram", "pos", "bow", "bertscore", "modernbert")
+OPTIONAL_METHODS = ("modernbert", "word_ngram_wtyt", "word_ngram_10k")
+SCORE_METHODS = ("word_ngram", "pos", "bow", "bertscore", *OPTIONAL_METHODS)
 METHODS = (*SCORE_METHODS, "likelihood")
 
 
@@ -129,11 +130,9 @@ def compare_primary(path, pair_hashes, rows, teachers, methods, cfg):
     }
 
 
-def compare_teacher_classifiers(rows, teachers, methods, cfg):
+def compare_teacher_classifiers(rows, teachers, scores, reference, cfg):
     labels = np.array([teachers.index(row["true_teacher"]) for row in rows])
-    modernbert = methods["modernbert"][0].argmax(1) == labels
-    word_ngram = methods["word_ngram"][0].argmax(1) == labels
-    delta = modernbert.astype(float) - word_ngram
+    delta = (scores.argmax(1) == labels).astype(float) - (reference.argmax(1) == labels)
     groups = grouped_indexes([row["source_dataset"] for row in rows])
     groups["all"] = np.arange(len(rows))
     return {
@@ -213,7 +212,7 @@ def evaluate_paper(
                 print(f"Using verified cached method: {method}", flush=True)
                 continue
             print(f"Running paper method: {method}", flush=True)
-            if method in ("word_ngram", "pos"):
+            if method in ("word_ngram", "word_ngram_wtyt", "word_ngram_10k", "pos"):
                 nlp = None
                 if method == "pos":
                     import spacy
@@ -281,7 +280,9 @@ def evaluate_paper(
         "methods": results,
         "num_test_prompts": len({r["prompt_id"] for r in splits["test"]}),
         "pending_methods": [
-            m for m in SCORE_METHODS if m not in all_methods and (m != "modernbert" or m in methods)
+            m
+            for m in SCORE_METHODS
+            if m not in all_methods and (m not in OPTIONAL_METHODS or m in methods)
         ],
         "pending_likelihood_teachers": pending,
         "environment": provenance(),
@@ -290,14 +291,22 @@ def evaluate_paper(
         "reproduction_status": (
             "Paper-inspired matched-data comparison, not an exact reproduction: different "
             "candidate models, four classes rather than five, mixed-task student training, "
-            "different instruction/safety data, train-only template selection and "
-            "teacher-validation tuning. No claim of beating the published table directly."
+            "different instruction/safety data, and train-only template selection. "
+            "No claim of beating the published table directly."
         ),
     }
-    comparison = None
-    if {"modernbert", "word_ngram"} <= all_methods.keys():
-        comparison = compare_teacher_classifiers(splits["test"], teachers, all_methods, cfg)
-        report["modernbert_vs_teacher_word_ngram"] = comparison
+    comparisons = {}
+    for method, label in (
+        ("modernbert", "ModernBERT"),
+        ("word_ngram_wtyt", "WTYT public code"),
+        ("word_ngram_10k", "10,000-feature cap only"),
+    ):
+        if {method, "word_ngram"} <= all_methods.keys():
+            comparison = compare_teacher_classifiers(
+                splits["test"], teachers, all_methods[method][0], all_methods["word_ngram"][0], cfg
+            )
+            report[f"{method}_vs_teacher_word_ngram"] = comparison
+            comparisons[label] = comparison
     if primary:
         report["comparison_to_student_supervised"] = compare_primary(
             primary, hashes, splits["test"], teachers, all_methods, cfg
@@ -363,11 +372,11 @@ def evaluate_paper(
                     "Full responses and the test set are unchanged.",
                 ]
             )
-    if comparison:
+    for label, comparison in comparisons.items():
         lines.extend(
             [
                 "",
-                "| Dataset | ModernBERT minus teacher word n-grams | Paired 95% prompt CI |",
+                f"| Dataset | {label} minus teacher word n-grams | Paired 95% prompt CI |",
                 "|---|---:|---:|",
             ]
         )

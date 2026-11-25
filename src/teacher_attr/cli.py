@@ -59,7 +59,16 @@ def main(argv: list[str] | None = None) -> None:
         "--methods",
         nargs="+",
         default=["word_ngram", "pos", "bow"],
-        choices=["word_ngram", "pos", "bow", "bertscore", "likelihood", "modernbert"],
+        choices=[
+            "word_ngram",
+            "word_ngram_wtyt",
+            "word_ngram_10k",
+            "pos",
+            "bow",
+            "bertscore",
+            "likelihood",
+            "modernbert",
+        ],
     )
     paper.add_argument("--scope", choices=["per_dataset", "pooled"], default="per_dataset")
     paper.add_argument("--teacher", help="One candidate teacher per likelihood job")

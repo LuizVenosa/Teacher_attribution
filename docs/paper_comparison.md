@@ -119,6 +119,35 @@ word n-gram accuracy difference overall and per dataset. A completed ModernBERT
 score file is reused on subsequent invocations. An interruption before it is
 saved requires rerunning this method.
 
+### Compare with the author's public n-gram code
+
+`word_ngram_wtyt` uses the settings in the author's
+[public configuration](https://github.com/sominw/pattern_distillation/blob/2cbc73eca5a49da155d1f8bb810045a93f323bd4/text_analysis/config.py#L41-L45)
+and [classifier](https://github.com/sominw/pattern_distillation/blob/2cbc73eca5a49da155d1f8bb810045a93f323bd4/text_analysis/src/lr_analysis.py#L14-L47).
+It strips `####`, lowercases and tokenizes with NLTK, then counts word 1–3 grams
+with scikit-learn's default token pattern and a 10,000-feature cap. Logistic
+regression uses fixed C=1, seed 42, and at most 1,000 iterations. This matches the
+public code's original-length branch. Table 2 lists 1–4 grams. We keep our own
+teacher training splits and full student test set fixed to compare implementations.
+
+The method needs NLTK 3.9 or newer and English Punkt data. Prepare the tokenizer
+on the login node, then submit the CPU job in the existing per-dataset evaluation.
+
+```bash
+python -m nltk.downloader -d "$HOME/nltk_data" punkt_tab
+CONFIG=configs/research_budget_v1.yaml MODEL_CACHE_MODE=offline REQUIRE_GPU=0 \
+bash scripts/submit_slurm.sh --gres=none --mem=16G --time=01:00:00 \
+  --job-name=paper-wtyt-ngram \
+  -- evaluate-paper --name paper_v1 --scope per_dataset \
+  --methods word_ngram_wtyt word_ngram_10k \
+  --primary runs/research_budget_v1/evaluations/primary_v2
+```
+
+`summary.md` reports paired accuracy changes from our existing n-gram baseline
+overall and by dataset. `word_ngram_wtyt` changes the cap, n-gram range,
+tokenization, preprocessing and logistic regression settings. `word_ngram_10k`
+changes only the cap in our existing classifier to measure its effect separately.
+
 The SLURM wrapper now removes only its own `mktemp` model cache on ordinary exit,
 including Python failures. It does not remove pre-existing caches from other jobs.
 SIGKILL/node failures can still leave temporary directories for later cleanup.
