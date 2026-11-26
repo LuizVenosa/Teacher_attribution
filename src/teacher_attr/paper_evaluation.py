@@ -19,7 +19,13 @@ from teacher_attr.pairs import load_pairs
 from teacher_attr.paper_scoring import atomic_array
 from teacher_attr.research import provenance
 
-OPTIONAL_METHODS = ("modernbert", "word_ngram_wtyt", "word_ngram_10k")
+NGRAM_ABLATIONS = {
+    "word_ngram_10k_no_punct": "No punctuation or symbols",
+    "word_ngram_10k_qa_mask": "Masked QA choice labels",
+    "word_ngram_10k_trigrams": "1–3 grams",
+    "word_ngram_10k_fixed_c": "Fixed C=1",
+}
+OPTIONAL_METHODS = ("modernbert", "word_ngram_wtyt", "word_ngram_10k", *NGRAM_ABLATIONS)
 SCORE_METHODS = ("word_ngram", "pos", "bow", "bertscore", *OPTIONAL_METHODS)
 METHODS = (*SCORE_METHODS, "likelihood")
 
@@ -212,7 +218,13 @@ def evaluate_paper(
                 print(f"Using verified cached method: {method}", flush=True)
                 continue
             print(f"Running paper method: {method}", flush=True)
-            if method in ("word_ngram", "word_ngram_wtyt", "word_ngram_10k", "pos"):
+            if method in (
+                "word_ngram",
+                "word_ngram_wtyt",
+                "word_ngram_10k",
+                "pos",
+                *NGRAM_ABLATIONS,
+            ):
                 nlp = None
                 if method == "pos":
                     import spacy
@@ -306,7 +318,19 @@ def evaluate_paper(
                 splits["test"], teachers, all_methods[method][0], all_methods["word_ngram"][0], cfg
             )
             report[f"{method}_vs_teacher_word_ngram"] = comparison
-            comparisons[label] = comparison
+            comparisons[f"{label} minus teacher word n-grams"] = comparison
+    if "word_ngram_10k" in all_methods:
+        for method, label in NGRAM_ABLATIONS.items():
+            if method in all_methods:
+                comparison = compare_teacher_classifiers(
+                    splits["test"],
+                    teachers,
+                    all_methods[method][0],
+                    all_methods["word_ngram_10k"][0],
+                    cfg,
+                )
+                report[f"{method}_vs_word_ngram_10k"] = comparison
+                comparisons[f"{label} minus 10,000-feature baseline"] = comparison
     if primary:
         report["comparison_to_student_supervised"] = compare_primary(
             primary, hashes, splits["test"], teachers, all_methods, cfg
@@ -376,7 +400,7 @@ def evaluate_paper(
         lines.extend(
             [
                 "",
-                f"| Dataset | {label} minus teacher word n-grams | Paired 95% prompt CI |",
+                f"| Dataset | {label} | Paired 95% prompt CI |",
                 "|---|---:|---:|",
             ]
         )

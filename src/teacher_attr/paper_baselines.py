@@ -1,5 +1,6 @@
 """Teacher-only feature learning; student labels are used only for test metrics."""
 
+import re
 import warnings
 from collections import Counter
 from importlib.metadata import version
@@ -11,6 +12,33 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import normalize
 
 from teacher_attr.evaluation import fit_probe
+
+QA_DATASETS = {"commonsenseqa", "openbookqa", "quarel"}
+QA_LABEL_PATTERNS = (
+    re.compile(r"(?P<prefix>\b(?i:option|choice)[ \t]+\**)(?P<label>[A-E])\b"),
+    re.compile(r"(?P<prefix>[\[(])(?P<label>[A-Ea-e])(?=[\])])"),
+    re.compile(
+        r"(?P<prefix>\b(?i:(?:(?:final|correct) )?answer)"
+        r"[ \t]*(?:[:=\-–—]|(?i:\bis\b))[ \t]*\**[ \t]*)(?P<label>[A-Ea-e])"
+        r"(?=[ \t]*(?:[.*,:;!?)\]]|$|(?i:\bbecause\b)))",
+        re.MULTILINE,
+    ),
+    re.compile(
+        r"(?P<prefix>^[ \t]*\**)(?P<label>[A-Ea-e])(?=[ \t]*[.)\]*!]*[ \t]*$)",
+        re.MULTILINE,
+    ),
+    re.compile(
+        r"(?P<prefix>^[ \t]*\**)(?P<label>[A-E])(?=[.)][ \t]+\S)",
+        re.MULTILINE,
+    ),
+)
+
+
+def mask_qa_answer_letters(text):
+    """Mask explicit choice labels while preserving surrounding text and markup."""
+    for pattern in QA_LABEL_PATTERNS:
+        text = pattern.sub(lambda match: f"{match['prefix']}CHOICELETTER", text)
+    return text
 
 
 def teacher_examples(rows, teachers):
@@ -119,18 +147,41 @@ def classifier_scores(splits, teachers, cfg, method, scope, nlp=None):
             scores[indexes] = prediction
             selected[dataset] = {**choice, **metadata}
             continue
-        if method in ("word_ngram", "word_ngram_10k"):
+        candidates = cfg["evaluation"]["logreg_c"]
+        if method != "pos":
+            max_n = 3 if method == "word_ngram_10k_trigrams" else 4
+            token_pattern = (
+                r"(?u)\b\w+\b" if method == "word_ngram_10k_no_punct" else r"(?u)\b\w+\b|[^\w\s]"
+            )
+            if method == "word_ngram_10k_qa_mask":
+                sources = {s: [r["source_dataset"] for r in rows] for s, rows in train_val.items()}
+                sources["test"] = [test[i]["source_dataset"] for i in indexes]
+                masked = {
+                    s: [
+                        mask_qa_answer_letters(text) if source in QA_DATASETS else text
+                        for text, source in zip(values, sources[s], strict=True)
+                    ]
+                    for s, values in texts.items()
+                }
+                metadata["masked_response_rows"] = {
+                    s: sum(old != new for old, new in zip(texts[s], values, strict=True))
+                    for s, values in masked.items()
+                }
+                texts = masked
+            if method == "word_ngram_10k_fixed_c":
+                candidates = [1.0]
             vectorizer = CountVectorizer(
-                ngram_range=(1, 4),
-                token_pattern=r"(?u)\b\w+\b|[^\w\s]",
-                max_features=10000 if method == "word_ngram_10k" else 200000,
+                ngram_range=(1, max_n),
+                token_pattern=token_pattern,
+                max_features=200000 if method == "word_ngram" else 10000,
             )
             features = {"train": vectorizer.fit_transform(texts["train"])}
             features.update({s: vectorizer.transform(texts[s]) for s in ("val", "test")})
             metadata.update(
-                features="word 1-4 gram counts; teacher-training vocabulary only",
+                features=f"word 1-{max_n} gram counts; teacher-training vocabulary only",
                 max_features=vectorizer.max_features,
                 vocabulary_size=len(vectorizer.vocabulary_),
+                token_pattern=token_pattern,
             )
         else:
             documents = {s: pos_documents(nlp, values) for s, values in texts.items()}
@@ -138,7 +189,7 @@ def classifier_scores(splits, teachers, cfg, method, scope, nlp=None):
             features = {s: indicator_matrix(values, vocabulary) for s, values in documents.items()}
             metadata.update(vocabulary=vocabulary, features="binary four-tag template indicators")
         # fit_probe consumes labels for train/val only; no student labels supplied.
-        prediction, choice = fit_probe(features, labels, cfg["evaluation"]["logreg_c"])
+        prediction, choice = fit_probe(features, labels, candidates)
         scores[indexes] = prediction
         selected[dataset] = {**choice, **metadata}
     selection = {"scope": scope, "selection_data": "teacher validation only", "groups": selected}
@@ -149,6 +200,8 @@ def classifier_scores(splits, teachers, cfg, method, scope, nlp=None):
             nltk_version=version("nltk"),
             scikit_learn_version=version("scikit-learn"),
         )
+    elif method == "word_ngram_10k_fixed_c":
+        selection["selection_data"] = "fixed C=1; validation accuracy is diagnostic"
     return scores, selection
 
 

@@ -12,6 +12,7 @@ from teacher_attr.paper_baselines import (
     bow_scores,
     classifier_scores,
     indicator_matrix,
+    mask_qa_answer_letters,
     pos_documents,
     pos_vocabulary,
     teacher_examples,
@@ -251,6 +252,53 @@ def test_modernbert_fits_only_teacher_text(paper_data, config, tiny_models):
             row["true_teacher"] = "CANARY"
     changed, _ = modernbert_scores(splits, ["a", "b"], cfg, "per_dataset")
     np.testing.assert_allclose(changed, scores, atol=1e-6)
+
+
+def test_mask_qa_letters_preserves_marker_text_and_ordinary_words():
+    text = (
+        "A tree is a plant. Option **C** contradicts (D).\n"
+        "B) Leaves\n**Final Answer:** B\nFinal answer is a tree.\nB."
+    )
+    assert mask_qa_answer_letters(text) == (
+        "A tree is a plant. Option **CHOICELETTER** contradicts (CHOICELETTER).\n"
+        "CHOICELETTER) Leaves\n**Final Answer:** CHOICELETTER\n"
+        "Final answer is a tree.\nCHOICELETTER."
+    )
+
+
+def test_ngram_ablations_remove_separate_cues_on_the_same_rows(paper_data):
+    cfg, splits, root = paper_data
+    for split, rows in splits.items():
+        for row in rows:
+            if row["source_dataset"] == "one":
+                row["source_dataset"] = "openbookqa"
+                refs = {"a": "Final answer: A.", "b": "Final answer: B."}
+            else:
+                refs = {"a": "Example response!", "b": "Example response?"}
+            row["teacher_responses"] = refs
+            if split == "test":
+                row["student_response"] = refs[row["true_teacher"]]
+
+    result = paper.evaluate_paper(cfg, methods=["word_ngram_10k", *paper.NGRAM_ABLATIONS])
+    out = root / "evaluations/paper_v1"
+    report = json.loads((out / "metrics.json").read_text())
+    assert result["methods"]["word_ngram_10k"] == 1.0
+    assert result["methods"]["word_ngram_10k_no_punct"] == 0.75
+    assert result["methods"]["word_ngram_10k_qa_mask"] == 0.75
+    no_punct = report["word_ngram_10k_no_punct_vs_word_ngram_10k"]
+    masked = report["word_ngram_10k_qa_mask_vs_word_ngram_10k"]
+    assert [no_punct[ds]["accuracy_difference"] for ds in ("openbookqa", "two")] == [0.0, -0.5]
+    assert [masked[ds]["accuracy_difference"] for ds in ("openbookqa", "two")] == [-0.5, 0.0]
+    selection = report["methods"]["word_ngram_10k_qa_mask"]["selection"]["groups"]
+    assert selection["openbookqa"]["masked_response_rows"] == {"train": 8, "val": 8, "test": 8}
+    assert selection["two"]["masked_response_rows"] == {"train": 0, "val": 0, "test": 0}
+    trigrams = report["methods"]["word_ngram_10k_trigrams"]["selection"]["groups"]
+    assert trigrams["openbookqa"]["features"].startswith("word 1-3 gram counts")
+    fixed = report["methods"]["word_ngram_10k_fixed_c"]["selection"]["groups"]
+    assert fixed["openbookqa"]["C"] == 1.0
+    assert (
+        "Masked QA choice labels minus 10,000-feature baseline" in (out / "summary.md").read_text()
+    )
 
 
 def test_score_tampering_is_rejected(tmp_path):

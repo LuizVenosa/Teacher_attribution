@@ -148,6 +148,42 @@ overall and by dataset. `word_ngram_wtyt` changes the cap, n-gram range,
 tokenization, preprocessing and logistic regression settings. `word_ngram_10k`
 changes only the cap in our existing classifier to measure its effect separately.
 
+### Isolate the n-gram differences
+
+The four optional ablations start from `word_ngram_10k`. They keep the train,
+validation and test responses, class labels and per-dataset fits. Each changes
+one setting. Validation still selects C unless that setting is being tested.
+
+| Method | Change from `word_ngram_10k` |
+|---|---|
+| `word_ngram_10k_no_punct` | Drop punctuation and other non-word symbols. Keep single-letter words. |
+| `word_ngram_10k_qa_mask` | Replace explicit QA choice letters such as `(B)`, `option B` and `Final answer: B` with a common token in teacher and student responses. Preserve surrounding text. |
+| `word_ngram_10k_trigrams` | Use 1–3 grams. |
+| `word_ngram_10k_fixed_c` | Fit with C=1 instead of choosing C on teacher validation. |
+
+The QA mask also covers standalone answer letters and line-initial choice markers.
+It is a text heuristic, so it may miss unusual formatting and does not canonicalize
+answer text or infer correctness. The method records how many responses changed in
+each split and dataset. Evaluate its effect on the QA datasets, where it is applied.
+
+Run from the cluster checkout with the existing `paper_v1` results. This CPU job
+needs no NLTK resources and reuses cached scores, including `word_ngram_10k`.
+
+```bash
+MODEL_CACHE_MODE=offline REQUIRE_GPU=0 \
+bash scripts/submit_slurm.sh --gres=none --mem=16G --time=01:00:00 \
+  --job-name=paper-ngram-ablations \
+  -- --config configs/research_budget_v1.yaml evaluate-paper \
+  --name paper_v1 --scope per_dataset \
+  --methods word_ngram_10k word_ngram_10k_no_punct word_ngram_10k_qa_mask \
+            word_ngram_10k_trigrams word_ngram_10k_fixed_c \
+  --primary runs/research_budget_v1/evaluations/primary_v2
+```
+
+The Markdown summary reports paired changes against the 10,000-feature baseline
+overall and by dataset. The changes describe separate interventions and need not
+sum to the effect of the full WTYT public-code settings.
+
 The SLURM wrapper now removes only its own `mktemp` model cache on ordinary exit,
 including Python failures. It does not remove pre-existing caches from other jobs.
 SIGKILL/node failures can still leave temporary directories for later cleanup.
