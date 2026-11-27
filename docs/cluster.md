@@ -143,3 +143,30 @@ runtime and QC before using the full dataset. Generation resumes from its cache;
 student training still has no optimizer/checkpoint resume. An interrupted student
 run requires a fresh run directory. Do not automatically requeue training jobs.
 No jobs have been submitted and no A100 benchmark has been performed locally.
+
+## Expand the encoder training data
+
+From the cluster repository root, prepare 2,000 fresh prompts per source and submit
+generation for all four teachers and four students. The array runs one model at a
+time by default. The launcher prints the SLURM job ID.
+
+```bash
+source jobs/00_setup_env.sh
+JOB_CACHE_ROOT=/tmp bash scripts/submit_encoder_expansion.sh
+```
+
+After all eight tasks complete, build the three nested training sets from the same
+saved responses. Each set includes the original training pairs and uses the
+original validation and test pairs.
+
+```bash
+for n in 500 1000 2000; do
+  python scripts/build_encoder_expansion.py \
+    --config runs/encoder_expansion_12k/generation.yaml \
+    --per-dataset "$n"
+done
+```
+
+The resulting configs are under
+`runs/encoder_expansion_12k/encoder_plus_{3000,6000,12000}/encoder.yaml`.
+The directory sizes refer to additional prompts selected before matched quality exclusions.
