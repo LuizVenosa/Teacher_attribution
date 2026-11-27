@@ -32,6 +32,12 @@ QA_LABEL_PATTERNS = (
         re.MULTILINE,
     ),
 )
+MARKDOWN_QUOTE = re.compile(r"^([ \t]*)(?:>[ \t]+)+(?=\S)", re.MULTILINE)
+MARKDOWN_LINE_MARKER = re.compile(r"^([ \t]*)(?:#{1,6}|[-+*•◦▪])(?=[ \t]+\S)", re.MULTILINE)
+MARKDOWN_ORDERED_MARKER = re.compile(r"^([ \t]*[0-9]{1,9})[.)](?=[ \t]+\S)", re.MULTILINE)
+MARKDOWN_EMPHASIS = re.compile(
+    r"(?<![\w\\*])(\*{1,3})([^\s*](?:[^*\r\n]*?[^\s*])?)(?<!\\)\1(?![\w*])"
+)
 
 
 def mask_qa_answer_letters(text):
@@ -39,6 +45,13 @@ def mask_qa_answer_letters(text):
     for pattern in QA_LABEL_PATTERNS:
         text = pattern.sub(lambda match: f"{match['prefix']}CHOICELETTER", text)
     return text
+
+
+def normalize_layout_markers(text):
+    """Strip selected Markdown and list delimiters while preserving word tokens."""
+    for marker in (MARKDOWN_QUOTE, MARKDOWN_LINE_MARKER, MARKDOWN_ORDERED_MARKER):
+        text = marker.sub(r"\1", text)
+    return MARKDOWN_EMPHASIS.sub(r" \2 ", text)
 
 
 def teacher_examples(rows, teachers):
@@ -168,6 +181,16 @@ def classifier_scores(splits, teachers, cfg, method, scope, nlp=None):
                     for s, values in masked.items()
                 }
                 texts = masked
+            if method == "word_ngram_10k_layout_normalized":
+                normalized = {
+                    s: [normalize_layout_markers(text) for text in values]
+                    for s, values in texts.items()
+                }
+                metadata["layout_normalized_response_rows"] = {
+                    s: sum(old != new for old, new in zip(texts[s], values, strict=True))
+                    for s, values in normalized.items()
+                }
+                texts = normalized
             if method == "word_ngram_10k_fixed_c":
                 candidates = [1.0]
             vectorizer = CountVectorizer(

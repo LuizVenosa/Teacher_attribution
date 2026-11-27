@@ -21,6 +21,7 @@ from teacher_attr.research import provenance
 
 NGRAM_ABLATIONS = {
     "word_ngram_10k_no_punct": "No punctuation or symbols",
+    "word_ngram_10k_layout_normalized": "Layout-normalized",
     "word_ngram_10k_qa_mask": "Masked QA choice labels",
     "word_ngram_10k_trigrams": "1–3 grams",
     "word_ngram_10k_fixed_c": "Fixed C=1",
@@ -308,29 +309,27 @@ def evaluate_paper(
         ),
     }
     comparisons = {}
-    for method, label in (
-        ("modernbert", "ModernBERT"),
-        ("word_ngram_wtyt", "WTYT public code"),
-        ("word_ngram_10k", "10,000-feature cap only"),
+    for method, reference, label in (
+        ("modernbert", "word_ngram", "ModernBERT minus teacher word n-grams"),
+        ("word_ngram_wtyt", "word_ngram", "WTYT public code minus teacher word n-grams"),
+        ("word_ngram_10k", "word_ngram", "10,000-feature cap only minus teacher word n-grams"),
+        *(
+            (method, "word_ngram_10k", f"{label} minus 10,000-feature baseline")
+            for method, label in NGRAM_ABLATIONS.items()
+        ),
+        (
+            "word_ngram_10k_layout_normalized",
+            "word_ngram_10k_no_punct",
+            "Layout-normalized minus no punctuation or symbols",
+        ),
     ):
-        if {method, "word_ngram"} <= all_methods.keys():
+        if {method, reference} <= all_methods.keys():
             comparison = compare_teacher_classifiers(
-                splits["test"], teachers, all_methods[method][0], all_methods["word_ngram"][0], cfg
+                splits["test"], teachers, all_methods[method][0], all_methods[reference][0], cfg
             )
-            report[f"{method}_vs_teacher_word_ngram"] = comparison
-            comparisons[f"{label} minus teacher word n-grams"] = comparison
-    if "word_ngram_10k" in all_methods:
-        for method, label in NGRAM_ABLATIONS.items():
-            if method in all_methods:
-                comparison = compare_teacher_classifiers(
-                    splits["test"],
-                    teachers,
-                    all_methods[method][0],
-                    all_methods["word_ngram_10k"][0],
-                    cfg,
-                )
-                report[f"{method}_vs_word_ngram_10k"] = comparison
-                comparisons[f"{label} minus 10,000-feature baseline"] = comparison
+            reference_key = "teacher_word_ngram" if reference == "word_ngram" else reference
+            report[f"{method}_vs_{reference_key}"] = comparison
+            comparisons[label] = comparison
     if primary:
         report["comparison_to_student_supervised"] = compare_primary(
             primary, hashes, splits["test"], teachers, all_methods, cfg

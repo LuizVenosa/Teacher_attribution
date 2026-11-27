@@ -150,13 +150,14 @@ changes only the cap in our existing classifier to measure its effect separately
 
 ### Isolate the n-gram differences
 
-The four optional ablations start from `word_ngram_10k`. They keep the train,
+The optional ablations start from `word_ngram_10k`. They keep the train,
 validation and test responses, class labels and per-dataset fits. Each changes
 one setting. Validation still selects C unless that setting is being tested.
 
 | Method | Change from `word_ngram_10k` |
 |---|---|
 | `word_ngram_10k_no_punct` | Drop punctuation and other non-word symbols. Keep single-letter words. |
+| `word_ngram_10k_layout_normalized` | Strip selected Markdown headings, block quotes, list delimiters and asterisk emphasis. Preserve words, list numbers and ordinary sentence punctuation. |
 | `word_ngram_10k_qa_mask` | Replace explicit QA choice letters such as `(B)`, `option B` and `Final answer: B` with a common token in teacher and student responses. Preserve surrounding text. |
 | `word_ngram_10k_trigrams` | Use 1–3 grams. |
 | `word_ngram_10k_fixed_c` | Fit with C=1 instead of choosing C on teacher validation. |
@@ -183,6 +184,28 @@ bash scripts/submit_slurm.sh --gres=none --mem=16G --time=01:00:00 \
 The Markdown summary reports paired changes against the 10,000-feature baseline
 overall and by dataset. The changes describe separate interventions and need not
 sum to the effect of the full WTYT public-code settings.
+
+### Test layout markers separately
+
+The layout intervention applies symmetrically to teacher training and validation
+responses and student test responses. It targets line-initial headings, block
+quotes, bulleted and numbered lists, and paired asterisk emphasis. Coverage is
+heuristic. The selection metadata records `layout_normalized_response_rows` per
+dataset and split. Use those counts when interpreting small or null effects.
+
+With the existing `paper_v1` run, submit just the new method. The report loads
+the verified 10,000-feature and punctuation-free results already in the run and
+includes paired prompt intervals against both. The contrast with the punctuation-free
+method includes all symbols and punctuation that the layout intervention leaves in place.
+
+```bash
+MODEL_CACHE_MODE=offline REQUIRE_GPU=0 \
+bash scripts/submit_slurm.sh --gres=none --mem=16G --time=01:00:00 \
+  --job-name=paper-ngram-layout \
+  -- --config configs/research_budget_v1.yaml evaluate-paper \
+  --name paper_v1 --scope per_dataset --methods word_ngram_10k_layout_normalized \
+  --primary runs/research_budget_v1/evaluations/primary_v2
+```
 
 The SLURM wrapper now removes only its own `mktemp` model cache on ordinary exit,
 including Python failures. It does not remove pre-existing caches from other jobs.

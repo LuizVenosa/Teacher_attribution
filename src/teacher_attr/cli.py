@@ -64,6 +64,7 @@ def main(argv: list[str] | None = None) -> None:
             "word_ngram_wtyt",
             "word_ngram_10k",
             "word_ngram_10k_no_punct",
+            "word_ngram_10k_layout_normalized",
             "word_ngram_10k_qa_mask",
             "word_ngram_10k_trigrams",
             "word_ngram_10k_fixed_c",

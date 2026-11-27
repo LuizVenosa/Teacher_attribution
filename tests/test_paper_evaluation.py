@@ -1,5 +1,6 @@
 import copy
 import json
+import re
 from collections import Counter
 
 import numpy as np
@@ -13,6 +14,7 @@ from teacher_attr.paper_baselines import (
     classifier_scores,
     indicator_matrix,
     mask_qa_answer_letters,
+    normalize_layout_markers,
     pos_documents,
     pos_vocabulary,
     teacher_examples,
@@ -299,6 +301,49 @@ def test_ngram_ablations_remove_separate_cues_on_the_same_rows(paper_data):
     assert (
         "Masked QA choice labels minus 10,000-feature baseline" in (out / "summary.md").read_text()
     )
+
+
+def test_normalize_layout_preserves_words_and_sentence_punctuation():
+    original = (
+        "### Heading?\n> - **Alpha:** yes.\n  1) *Beta* (e.g., x).\n• Unicode!\n"
+        r"Use 2*3*4, 3.14, foo_bar and \*literal*."
+    )
+    normalized = normalize_layout_markers(original)
+    assert [" ".join(line.split()) for line in normalized.splitlines()] == [
+        "Heading?",
+        "Alpha: yes.",
+        "1 Beta (e.g., x).",
+        "Unicode!",
+        r"Use 2*3*4, 3.14, foo_bar and \*literal*.",
+    ]
+    assert re.findall(r"\b\w+\b", normalized) == re.findall(r"\b\w+\b", original)
+
+
+def test_layout_ablation_separates_markers_from_sentence_punctuation(paper_data):
+    cfg, splits, root = paper_data
+    for split, rows in splits.items():
+        for row in rows:
+            if row["source_dataset"] == "one":
+                refs = {"a": "- **Shared response.**", "b": "Shared response."}
+            else:
+                refs = {"a": "Shared response!", "b": "Shared response?"}
+            row["teacher_responses"] = refs
+            if split == "test":
+                row["student_response"] = refs[row["true_teacher"]]
+
+    paper.evaluate_paper(cfg, methods=["word_ngram_10k", "word_ngram_10k_no_punct"])
+    method = "word_ngram_10k_layout_normalized"
+    result = paper.evaluate_paper(cfg, methods=[method])
+    out = root / "evaluations/paper_v1"
+    report = json.loads((out / "metrics.json").read_text())
+    assert result["methods"][method] == 0.75
+    vs_baseline = report[f"{method}_vs_word_ngram_10k"]
+    vs_no_punct = report[f"{method}_vs_word_ngram_10k_no_punct"]
+    assert [vs_baseline[ds]["accuracy_difference"] for ds in ("one", "two")] == [-0.5, 0.0]
+    assert [vs_no_punct[ds]["accuracy_difference"] for ds in ("one", "two")] == [0.0, 0.5]
+    groups = report["methods"][method]["selection"]["groups"]
+    assert groups["one"]["layout_normalized_response_rows"] == {"train": 4, "val": 4, "test": 4}
+    assert groups["two"]["layout_normalized_response_rows"] == {"train": 0, "val": 0, "test": 0}
 
 
 def test_score_tampering_is_rejected(tmp_path):
